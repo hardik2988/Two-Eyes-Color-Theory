@@ -121,9 +121,10 @@ export class PaintMixingPuzzle implements IPuzzle {
   readonly educationalSummary =
     'In subtractive mixing, pigments absorb (subtract) light wavelengths. Blue absorbs red light; yellow absorbs blue light. The only wavelength both reflect back to our eyes is green. For deuteranopes like John, relying on canister shapes (● Circle + ▲ Triangle) and value contrast ensures reliable colour identification.'
   readonly hints = [
-    'Check the exhibition plaque: you need to create a secondary Green hue from two primary pigments.',
-    'Jack sees that Cobalt Blue and Cadmium Yellow will create green. John notes that the Circle (●) and Triangle (▲) canisters combine to produce the target.',
-    'Select Cobalt Ultramarine (●) and Cadmium Lemon (▲) together, then test the blend.',
+    'Objective: Mix physical pigments on the palette to produce the target Viridian Leaf Green (#15803d) and unlock Installation 02.',
+    'Colour Theory: Screens emit additive RGB light (Red + Green = Yellow), but artist paints work by subtractive light absorption. Blue absorbs red light; yellow absorbs blue light. The only reflected wavelength remaining is Green.',
+    'Actionable Clue: Jack sees that Cobalt Blue and Cadmium Yellow will create green. John notes the corresponding canister marks: Circle (●) and Triangle (▲).',
+    'Guided Solution: Select Cobalt Ultramarine (●) and Cadmium Lemon (▲) together, then click "Test Solution".',
   ]
 
   state: PuzzleState = 'available'

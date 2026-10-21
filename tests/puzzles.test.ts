@@ -133,3 +133,16 @@ describe('CountdownTimer', () => {
     expect(timer.remainingSeconds).toBe(900)
   })
 })
+
+describe('Progressive Hint System', () => {
+  it('provides 4 progressive hints for all four installations', () => {
+    const puzzles = [new PaintMixingPuzzle(), new ValuePuzzle(), new HarmonyPuzzle(), new VaultPuzzle()]
+    for (const puzzle of puzzles) {
+      expect(puzzle.hints.length).toBe(4)
+      expect(puzzle.getHint(0).toLowerCase()).toContain('objective')
+      expect(puzzle.getHint(1).toLowerCase()).toContain('colour theory')
+      expect(puzzle.getHint(2).toLowerCase()).toContain('clue')
+      expect(puzzle.getHint(3).toLowerCase()).toContain('solution')
+    }
+  })
+})

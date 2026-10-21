@@ -42,7 +42,6 @@ export class Game {
   private time = 0
   private noteTime = 0
   private footstepAccumulator = 0
-  private hintIndex = 0
 
   // Vault opening animation state
   private vaultOpening = false
@@ -83,19 +82,75 @@ export class Game {
   }
 
   get currentObjective(): string {
+    const g = this.guidance
     if (this.vaultOpening || this.puzzles.vault.isComplete) {
       return 'Exhibition Complete · Vault Unlocked · Walk inside to finish'
     }
+    return `Installation 0${g.level}: ${g.title} · ${g.targetName} (${g.arrow} ${g.distance.toFixed(1)}m ${g.direction})`
+  }
+
+  get guidance(): {
+    level: number
+    total: number
+    title: string
+    targetName: string
+    distance: number
+    direction: string
+    arrow: string
+  } {
+    const targetPos = new THREE.Vector3(0, 0.72, 3.05)
+    let level = 1
+    let title = 'Subtractive Pigment Mixing'
+    let targetName = 'Mixing Bench'
+
     if (this.puzzles.harmonies.state === 'completed') {
-      return 'Installation 04: The Exhibition Vault · Decrypt Master Keypad'
+      level = 4
+      title = 'The Exhibition Vault'
+      targetName = 'Vault Door'
+      targetPos.set(0, 0.72, -7.0)
+    } else if (this.puzzles.value.state === 'completed') {
+      level = 3
+      title = 'Gallery Wall Colour Harmonies'
+      targetName = 'South Gallery Wall'
+      targetPos.set(0, 0.72, 7.15)
+    } else if (this.puzzles.paintMixing.state === 'completed') {
+      level = 2
+      title = 'Value & Saturation Easel'
+      targetName = 'Value Easel'
+      targetPos.set(-3.25, 0.72, 0.55)
     }
-    if (this.puzzles.value.state === 'completed') {
-      return 'Installation 03: South Gallery Wall · Order Colour Harmonies'
+
+    const playerPos = this.player.position
+    const dx = targetPos.x - playerPos.x
+    const dz = targetPos.z - playerPos.z
+    const distance = Math.hypot(dx, dz)
+
+    const camDir = new THREE.Vector3()
+    this.player.camera.getWorldDirection(camDir)
+    const forwardAngle = Math.atan2(camDir.x, camDir.z)
+    const targetAngle = Math.atan2(dx, dz)
+    let diff = targetAngle - forwardAngle
+    while (diff > Math.PI) diff -= Math.PI * 2
+    while (diff < -Math.PI) diff += Math.PI * 2
+
+    let arrow = '▲'
+    let direction = 'Ahead'
+    const deg = (diff * 180) / Math.PI
+    if (Math.abs(deg) <= 28) {
+      arrow = '▲'
+      direction = 'Ahead'
+    } else if (deg > 28 && deg < 115) {
+      arrow = '▶'
+      direction = 'Turn Right'
+    } else if (deg < -28 && deg > -115) {
+      arrow = '◀'
+      direction = 'Turn Left'
+    } else {
+      arrow = '▼'
+      direction = 'Behind'
     }
-    if (this.puzzles.paintMixing.state === 'completed') {
-      return 'Installation 02: The Value Easel · Match Reference Tone'
-    }
-    return 'Installation 01: The Mixing Bench · Subtractive Pigment Mixing'
+
+    return { level, total: 4, title, targetName, distance, direction, arrow }
   }
 
   start(showControls: boolean): void {
@@ -233,8 +288,10 @@ export class Game {
       this.player.look(this.input.takeLook())
       this.player.syncCamera()
       this.focusedTarget = this.findTarget()
+      this.world.setTargetHover(this.focusedTarget)
     } else if (this.mode === 'puzzle') {
       this.player.syncCamera()
+      this.world.setTargetHover(null)
     } else if (this.mode === 'attract') {
       const camera = this.player.camera
       const sway = this.reducedMotion ? 0 : Math.sin(this.time * 0.16) * 0.08
@@ -242,6 +299,7 @@ export class Game {
       camera.rotation.set(-0.06, 0, 0, 'YXZ')
       camera.lookAt(0, 1.72, -4.1)
       this.focusedTarget = null
+      this.world.setTargetHover(null)
     }
     this.world.update(this.time, frameSeconds)
     this.renderer.render(this.world.scene, this.player.camera)
@@ -254,39 +312,51 @@ export class Game {
     const roots = this.world.targets.map(target => target.object)
     const hits = this.raycaster.intersectObjects(roots, true)
     for (const hit of hits) {
-      if (hit.distance > 5.8) break
+      if (hit.distance > 8.5) break
       let current: THREE.Object3D | null = hit.object
       while (current) {
         const target = current.userData.interaction as StudioTarget | undefined
         if (target) {
-          // Dynamic interaction prompt label reflecting puzzle state
+          const isTooFar = hit.distance > 5.2
+
+          // Dynamic interaction prompt label reflecting puzzle state & distance
           if (target.id === 'paint-tins') {
-            target.label = this.puzzles.paintMixing.isComplete
-              ? 'Paint tins · Installation 01 (Solved) [E]'
-              : 'Paint tins · Subtractive Mixing Bench [E to Mix]'
+            if (isTooFar) {
+              target.label = 'Paint tins · Subtractive Mixing Bench [Move closer to interact]'
+            } else {
+              target.label = this.puzzles.paintMixing.isComplete
+                ? 'Paint tins · Installation 01 (Solved) [E to Review]'
+                : 'Paint tins · Subtractive Mixing Bench [E — Begin Paint Mixing]'
+            }
           } else if (target.id === 'value-station') {
             if (this.puzzles.paintMixing.state !== 'completed') {
-              target.label = 'Installation 02 · Value Easel [Locked · Complete Inst. 01 first]'
+              target.label = 'Installation 02 · [Installation locked — Complete Paint Mixing first]'
+            } else if (isTooFar) {
+              target.label = 'Installation 02 · Value Easel [Move closer to interact]'
             } else if (this.puzzles.value.isComplete) {
-              target.label = 'Installation 02 · Value Easel (Solved) [E]'
+              target.label = 'Installation 02 · Value Easel (Completed) [E to Review]'
             } else {
-              target.label = 'Installation 02 · The Value Easel [E to Examine]'
+              target.label = 'Installation 02 · Value Easel [E — Begin Value Challenge]'
             }
           } else if (target.id === 'harmonies') {
             if (this.puzzles.value.state !== 'completed') {
-              target.label = 'Installation 03 · Gallery Wall [Locked · Complete Inst. 02 first]'
+              target.label = 'Installation 03 · [Installation locked — Complete Value Challenge first]'
+            } else if (isTooFar) {
+              target.label = 'Installation 03 · Gallery Wall [Move closer to interact]'
             } else if (this.puzzles.harmonies.isComplete) {
-              target.label = 'Installation 03 · Gallery Wall (Solved) [E]'
+              target.label = 'Installation 03 · Gallery Wall (Completed) [E to Review]'
             } else {
-              target.label = 'Installation 03 · Gallery Wall Harmonies [E to Arrange]'
+              target.label = 'Installation 03 · Gallery Wall [E — Begin Colour Harmony Challenge]'
             }
           } else if (target.id === 'vault-door') {
             if (this.puzzles.harmonies.state !== 'completed') {
-              target.label = 'Installation 04 · Exhibition Vault [Locked · Solve Inst. 01–03 first]'
+              target.label = 'Installation 04 · [Installation locked — Complete all 3 installations first]'
             } else if (this.vaultOpening || this.puzzles.vault.isComplete) {
-              target.label = 'Installation 04 · Exhibition Vault (Open)'
+              target.label = 'Installation 04 · Exhibition Vault (Unlocked) [Walk Inside]'
+            } else if (isTooFar) {
+              target.label = 'Installation 04 · Exhibition Vault [Move closer to interact]'
             } else {
-              target.label = 'Installation 04 · Exhibition Vault [E to Decrypt Keypad]'
+              target.label = 'Installation 04 · Exhibition Vault [E — Open Vault Keypad]'
             }
           }
           return target
@@ -301,6 +371,13 @@ export class Game {
     if (!this.focusedTarget) {
       this.note = 'Look toward an installation bench, easel, painting or vault door to interact [E].'
       this.noteTime = 3.2
+      this.audio.play('ui')
+      return
+    }
+
+    if (this.focusedTarget.label.includes('Move closer to interact')) {
+      this.note = 'You are too far away. Move closer to interact [E].'
+      this.noteTime = 3.5
       this.audio.play('ui')
       return
     }
@@ -399,13 +476,24 @@ export class Game {
     }
   }
 
-  private showCurrentHint(): void {
+  hintStage: number = 0
+
+  showCurrentHint(): { stage: number; total: number; title: string; text: string } {
     const currentPuzzle = this.puzzles.currentPuzzle
-    const hint = currentPuzzle.getHint(this.hintIndex)
-    this.hintIndex = (this.hintIndex + 1) % currentPuzzle.hints.length
-    this.note = `[HINT ${currentPuzzle.number}/4] ${hint}`
-    this.noteTime = 8
+    const stageTitles = ['Objective', 'Colour Theory Principle', 'Actionable Clue', 'Guided Solution']
+    const stage = this.hintStage % 4
+    const text = currentPuzzle.getHint(stage)
+    const result = {
+      stage: stage + 1,
+      total: 4,
+      title: stageTitles[stage],
+      text,
+    }
+    this.hintStage = (this.hintStage + 1) % 4
+    this.note = `[HINT ${result.stage}/4 · ${result.title.toUpperCase()}] ${text}`
+    this.noteTime = 9
     this.audio.play('ui')
+    return result
   }
 
   private onTimeExpired(): void {

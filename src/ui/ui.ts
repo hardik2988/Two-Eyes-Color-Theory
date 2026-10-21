@@ -111,6 +111,8 @@ export class Ui {
   onPuzzleSolved?: (puzzleId: string) => void
   onPuzzleClosed?: () => void
 
+  hintStage: number = 0
+
   get isPuzzleOpen(): boolean {
     const overlay = this.root.querySelector<HTMLElement>('#puzzle-overlay')
     return Boolean(overlay && !overlay.classList.contains('is-hidden') && this.activePuzzle)
@@ -430,6 +432,29 @@ export class Ui {
       return
     }
 
+    const puzzleHintBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="puzzle-hint"]')
+    if (puzzleHintBtn && this.activePuzzle) {
+      const feedback = this.q<HTMLElement>('.puzzle-feedback')
+      if (feedback) {
+        feedback.hidden = false
+        const hints = this.activePuzzle.hints
+        const hintIdx = this.hintStage % hints.length
+        const hintTitles = ['Objective', 'Colour Theory Principle', 'Actionable Clue', 'Guided Solution']
+        feedback.innerHTML = `<strong>HINT ${hintIdx + 1}/4 (${hintTitles[hintIdx]}):</strong> ${hints[hintIdx]}`
+        this.hintStage = (this.hintStage + 1) % hints.length
+        this.audio.play('ui')
+      }
+      return
+    }
+
+    const resetPaletteBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="reset-palette"]')
+    if (resetPaletteBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
+      this.activePuzzle.clearSelection()
+      this.audio.play('ui')
+      this.renderPuzzleDialog()
+      return
+    }
+
     const puzzleCloseBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="puzzle-close"]')
     if (puzzleCloseBtn) {
       this.closePuzzle()
@@ -719,8 +744,10 @@ export class Ui {
         }).join('')}
       </div>
 
-      <div class="palette-btn-row">
-        <button type="button" class="btn btn-small" data-action="clear-palette">Clear Palette</button>
+      <div class="palette-btn-row" style="display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px;">
+        <button type="button" class="btn btn-small" data-action="reset-palette">Reset Palette</button>
+        <button type="button" class="btn btn-small btn-quiet" data-action="clear-palette">Clear Palette</button>
+        <button type="button" class="btn btn-small btn-quiet" data-action="puzzle-hint">Hint</button>
       </div>
 
       <div class="puzzle-feedback" role="status" aria-live="polite" hidden></div>
@@ -805,6 +832,13 @@ export class Ui {
       <div class="harmony-curator-plaque">
         <strong>Curator Plaque Sequence Rule:</strong>
         <p>Slot 1: Monochromatic (1 hue) → Slot 2: Analogous (30° neighbours) → Slot 3: Complementary (180° polar opposites) → Slot 4: Split-Complementary (150°/210° split wings)</p>
+      </div>
+
+      <div class="harmony-wheel-diagram" style="display: flex; gap: 8px; justify-content: space-around; padding: 8px 12px; background: rgba(0,48,73,0.06); border-radius: 6px; margin-bottom: 14px; font-size: 10px; color: var(--deep-space-blue);">
+        <div><strong>● Monochromatic:</strong> 1 Hue Angle (0°)</div>
+        <div><strong>▲ Analogous:</strong> 30° Clustered Neighbours</div>
+        <div><strong>■ Complementary:</strong> 180° Polar Opposites</div>
+        <div><strong>◆ Split-Comp:</strong> 150°/210° Twin Wings</div>
       </div>
 
       <div class="harmony-slots-grid">

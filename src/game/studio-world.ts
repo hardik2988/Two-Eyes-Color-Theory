@@ -130,6 +130,46 @@ export class StudioWorld {
     }
   }
 
+  private currentHoverTarget: StudioTarget | null = null
+
+  setTargetHover(target: StudioTarget | null): void {
+    if (this.currentHoverTarget === target) return
+
+    // Revert previous hover
+    if (this.currentHoverTarget) {
+      this.currentHoverTarget.object.traverse(child => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh
+          const mat = mesh.material as THREE.MeshStandardMaterial
+          if (mat && mat.emissive && mesh.userData.prevEmissive !== undefined) {
+            mat.emissive.setHex(mesh.userData.prevEmissive)
+            mat.emissiveIntensity = mesh.userData.prevEmissiveIntensity ?? 1
+            delete mesh.userData.prevEmissive
+            delete mesh.userData.prevEmissiveIntensity
+          }
+        }
+      })
+    }
+
+    this.currentHoverTarget = target
+
+    // Apply new hover feedback
+    if (target) {
+      target.object.traverse(child => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh
+          const mat = mesh.material as THREE.MeshStandardMaterial
+          if (mat && mat.emissive && mesh.userData.prevEmissive === undefined) {
+            mesh.userData.prevEmissive = mat.emissive.getHex()
+            mesh.userData.prevEmissiveIntensity = mat.emissiveIntensity
+            mat.emissive.setHex(0x669bbc)
+            mat.emissiveIntensity = 0.4
+          }
+        }
+      })
+    }
+  }
+
   update(time: number, delta: number): void {
     // 3D Waypoint beacon bob and spin
     if (this.objectiveBeacon.visible) {

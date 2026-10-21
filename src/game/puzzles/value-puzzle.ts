@@ -28,9 +28,10 @@ export class ValuePuzzle implements IPuzzle {
   readonly educationalSummary =
     'Hue describes the color family. Tint increases lightness by adding white. Shade decreases lightness by adding black. Tone desaturates by adding neutral grey. Even when red/green hue perception is altered by deuteranopia, value (luminance contrast) remains 100% perceptible and readable.'
   readonly hints = [
-    'Observe the target swatch on the easel: note whether it is lighter than the pure hue (tint), softened/muted (tone), or darkened (shade).',
-    'Switch to John with Tab: compare the luminance (grayscale brightness) against the value ramp on the workstation wall.',
-    'The reference sample is a Tone (pure hue + 40% neutral grey) at 0.50 luminance.',
+    'Objective: Examine the Value Easel and match the reference sample’s precise 0.48 (48%) luminance balance to unlock Installation 03.',
+    'Colour Theory: Value is lightness/darkness. Tint adds white (high luminance). Shade adds black (low luminance). Tone adds grey, reducing saturation while holding mid-range luminance. Luminance contrast remains 100% readable across all visual systems.',
+    'Actionable Clue: Look at the Luminance Ramp Comparator in the workbench. Pure Hue is too light (72%), Tint is over-luminous (86%), and Shade is too dark (22%). Tone aligns at 48%.',
+    'Guided Solution: Select the Tone variation card ("#475569 · Muted Slate Tone", 48% Luminance) and click "Test Solution".',
   ]
 
   state: PuzzleState = 'locked'

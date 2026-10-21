@@ -19,10 +19,10 @@ export class VaultPuzzle implements IPuzzle {
   readonly educationalSummary =
     'True accessible design is not about compensating for a deficiency; it is about recognizing that different visual systems excel at different perceptual tasks. John’s visual system easily detects edge orientation, hatching, and pattern alignment, while Jack’s detects red/green wavelength differences. Together, they achieve complete communication.'
   readonly hints = [
-    'Inspect the four plaque dials beside the heavy vault door.',
-    'As Jack, note down the four chromatic digits revealed in red-green contrast (4, 8, 2, 9).',
-    'Press Tab to switch to John: observe the geometric symbols (● Circle, ▲ Triangle, ■ Square, ◆ Diamond) indicating positions 1st, 2nd, 3rd, and 4th.',
-    'Enter the code "4829" into the physical vault keypad.',
+    'Objective: Unlock the Exhibition Vault Door at the North Wall using the 4-digit master access code.',
+    'Colour Theory: True accessible design synergizes distinct visual systems. Jack’s trichromatic vision reads red-green wavelength contrast, while John’s deuteranopia reads edge orientation, hatching, and shape-anchor positions.',
+    'Actionable Clue: Switch perspectives with Tab. Jack’s chromatic view reveals the four numbers: 4, 8, 2, 9. John’s view reveals the shape anchor positions: ● Circle (1st), ▲ Triangle (2nd), ■ Square (3rd), ◆ Diamond (4th).',
+    'Guided Solution: Enter master code "4829" on the 10-key numeric vault keypad, then click "Unlock Vault".',
   ]
 
   state: PuzzleState = 'locked'

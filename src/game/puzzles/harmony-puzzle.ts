@@ -24,9 +24,10 @@ export class HarmonyPuzzle implements IPuzzle {
   readonly educationalSummary =
     'Harmonies are geometric relationships on the colour wheel. Monochromatic uses 1 hue with varying value. Analogous uses adjacent neighbours (30° apart). Complementary pairs polar opposites (180° across). Split-Complementary pairs a base hue with the two neighbours of its complement (150°/210°). John relies on geometric wheel markers and geometric frame borders to verify angular spacing.'
   readonly hints = [
-    'Inspect the curator plaque above the four frames: it demands the order Monochromatic → Analogous → Complementary → Split-Complementary.',
-    'Examine each painting’s color-wheel wheel diagram: 1 point = Monochromatic, 3 adjacent clustered points = Analogous, 2 opposite points = Complementary, 1 point opposite 2 split wings = Split-Complementary.',
-    'Swap paintings so Slot 1 is "Solitude" (Mono), Slot 2 is "Coastline" (Analogous), Slot 3 is "Horizon Clash" (Complementary), and Slot 4 is "Equilibrium" (Split-Complementary).',
+    'Objective: Visit the South Gallery Wall and arrange all four curator paintings into the harmonic sequence specified on the curator plaque.',
+    'Colour Theory: Harmonies are geometric relationships on the 360° colour wheel. Monochromatic uses 1 hue with value steps. Analogous uses adjacent neighbours (30° apart). Complementary pairs polar opposites (180° across). Split-Complementary pairs a base hue with two neighbours of its complement (150°/210°).',
+    'Actionable Clue: Read the curator plaque above the frames: Slot 1 must be Monochromatic, Slot 2 Analogous, Slot 3 Complementary, Slot 4 Split-Complementary. Use the ◀ Left and Right ▶ buttons to swap adjacent paintings.',
+    'Guided Solution: Arrange the paintings in this exact order: 1. Solitude (Mono) → 2. Coastline (Analogous) → 3. Horizon Clash (Complementary) → 4. Equilibrium (Split-Complementary).',
   ]
 
   state: PuzzleState = 'locked'
