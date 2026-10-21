@@ -279,6 +279,22 @@ export class StudioWorld {
       this.box('Window sill', v3(0.18, 0.08, 3.2), v3(8.73, 0.78, z), this.mats.wood, false)
     }
 
+    // Realistic architectural daylight sunbeam shafts streaming from West windows
+    const sunbeamMat = new THREE.MeshBasicMaterial({
+      color: 0xfff6e4,
+      transparent: true,
+      opacity: 0.045,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    for (const z of [-4.35, 0, 4.35]) {
+      const beamGeo = new THREE.PlaneGeometry(2.9, 5.2)
+      const beam = new THREE.Mesh(beamGeo, sunbeamMat)
+      beam.position.set(-6.2, 2.2, z)
+      beam.rotation.set(0.08, Math.PI / 2, 0.42)
+      this.scene.add(beam)
+    }
+
     // The Exit Vault Door
     this.addVault()
 
@@ -667,32 +683,58 @@ export class StudioWorld {
 
   private floorMaterial(): THREE.MeshStandardMaterial {
     const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = 256
+    canvas.width = 1024
+    canvas.height = 1024
     const ctx = canvas.getContext('2d')!
 
-    // Light honey oak wood planks
-    ctx.fillStyle = '#e8d7be'
-    ctx.fillRect(0, 0, 256, 256)
+    // Base warm Scandinavian oak tone
+    ctx.fillStyle = '#eddcc8'
+    ctx.fillRect(0, 0, 1024, 1024)
 
-    // Wood grain lines and subtle planks
-    for (let y = 0; y < 256; y += 32) {
-      ctx.fillStyle = 'rgba(168, 142, 110, 0.35)'
-      ctx.fillRect(0, y, 256, 1.5) // plank border
+    const plankHeight = 128
+    for (let y = 0; y < 1024; y += plankHeight) {
+      // Subtle tonal variation between different planks
+      const plankTone = ((y / plankHeight) % 3) * 6 - 6
+      ctx.fillStyle = `rgba(${235 + plankTone}, ${215 + plankTone}, ${195 + plankTone}, 0.35)`
+      ctx.fillRect(0, y, 1024, plankHeight)
 
-      // Fine grain
-      for (let x = 0; x < 256; x += 4) {
-        const grainShade = Math.sin(x * 0.15 + y) * 8
-        ctx.fillStyle = `rgba(${190 + grainShade}, ${165 + grainShade}, ${135 + grainShade}, 0.15)`
-        ctx.fillRect(x, y + 2, 4, 28)
+      // Beveled plank seam shadow and highlight
+      ctx.fillStyle = 'rgba(80, 60, 40, 0.4)'
+      ctx.fillRect(0, y, 1024, 2.5)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)'
+      ctx.fillRect(0, y + 2.5, 1024, 1.2)
+
+      // Staggered vertical plank end joints
+      const xOffset = ((y / plankHeight) % 2) * 512 + 256
+      ctx.fillStyle = 'rgba(80, 60, 40, 0.4)'
+      ctx.fillRect(xOffset % 1024, y, 2.5, plankHeight)
+
+      // Fine organic wood grain fibers
+      for (let py = y + 4; py < y + plankHeight - 4; py += 3) {
+        ctx.beginPath()
+        ctx.strokeStyle = `rgba(140, 115, 88, ${0.07 + Math.sin(py * 0.2) * 0.04})`
+        ctx.lineWidth = 1.1
+        ctx.moveTo(0, py + Math.sin(py * 0.05) * 4)
+        for (let x = 64; x <= 1024; x += 64) {
+          ctx.lineTo(x, py + Math.sin((x + py) * 0.03) * 3)
+        }
+        ctx.stroke()
       }
     }
 
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-    texture.repeat.set(6, 5)
-    texture.anisotropy = 4
-    return new THREE.MeshStandardMaterial({ map: texture, color: 0xf5ebd9, roughness: 0.44, metalness: 0.02 })
+    texture.repeat.set(5, 5)
+    texture.anisotropy = 8
+    texture.generateMipmaps = true
+
+    return new THREE.MeshStandardMaterial({
+      map: texture,
+      color: 0xfcf5ec,
+      roughness: 0.38,
+      metalness: 0.02,
+    })
   }
 
   private box(name: string, size: THREE.Vector3, center: THREE.Vector3, material: THREE.Material, collide: boolean): THREE.Mesh {

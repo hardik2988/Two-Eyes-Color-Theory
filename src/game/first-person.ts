@@ -68,7 +68,7 @@ export class FirstPersonController {
 
   look(delta: { x: number; y: number }): void {
     this.yaw = THREE.MathUtils.euclideanModulo(this.yaw - delta.x + Math.PI, Math.PI * 2) - Math.PI
-    this.pitch = THREE.MathUtils.clamp(this.pitch - delta.y, -0.92, 0.72)
+    this.pitch = THREE.MathUtils.clamp(this.pitch - delta.y, -1.42, 1.35)
     this.syncCamera()
   }
 

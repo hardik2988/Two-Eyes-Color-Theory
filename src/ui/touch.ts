@@ -18,7 +18,10 @@ export class TouchControls {
     this.knob = this.stick.querySelector('i')!
     const radius = 56
 
-    const enable = () => document.body.classList.add('has-touch')
+    const enable = () => {
+      document.body.classList.add('has-touch')
+      this.input.method = 'touch'
+    }
     if (matchMedia('(pointer: coarse)').matches) enable()
     window.addEventListener('touchstart', enable, { once: true, passive: true })
     // Any touch switches hints/prompts to touch, even taps on menu buttons.

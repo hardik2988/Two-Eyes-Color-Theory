@@ -60,10 +60,42 @@ export class Input {
     })
     on(window, 'keyup', e => this.keys.delete(e.code))
     on(window, 'blur', () => this.keys.clear())
+    let isMouseDown = false
+    let lastX = 0
+    let lastY = 0
+    on(window, 'mousedown', e => {
+      if (this.method === 'touch') return
+      if (e.button === 0 && this.gameActive) {
+        const target = e.target as HTMLElement | null
+        if (!target?.closest('button, input, select, textarea, [data-nav]')) {
+          isMouseDown = true
+          lastX = e.clientX
+          lastY = e.clientY
+          this.lockPointer()
+        }
+      }
+    })
+    on(window, 'mouseup', () => {
+      isMouseDown = false
+    })
     on(window, 'mousemove', e => {
-      if (document.pointerLockElement !== canvas) return
-      this.look.x += e.movementX * 0.0022
-      this.look.y += e.movementY * 0.0022
+      if (!this.gameActive || this.method === 'touch') return
+      const isLocked = document.pointerLockElement === canvas
+      let dx = 0
+      let dy = 0
+      if (isLocked) {
+        dx = e.movementX
+        dy = e.movementY
+      } else if (isMouseDown) {
+        dx = e.clientX - lastX
+        dy = e.clientY - lastY
+        lastX = e.clientX
+        lastY = e.clientY
+      } else {
+        return
+      }
+      this.look.x += dx * 0.0022
+      this.look.y += dy * 0.0022
     })
   }
 

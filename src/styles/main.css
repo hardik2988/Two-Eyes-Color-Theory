@@ -316,7 +316,13 @@ kbd { display: inline-grid; min-width: 26px; height: 26px; place-items: center; 
 .toggle[aria-pressed="true"] i { transform: translateX(19px); }
 
 /* In-Game Architectural HUD */
-.screen-hud { z-index: 6; overflow: hidden; background: transparent; pointer-events: none; }
+.screen-hud,
+#ui > .screen-hud.is-active {
+  z-index: 6;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none !important;
+}
 .screen-hud.is-active { display: block !important; }
 .studio-hud-top {
   position: absolute;

@@ -131,7 +131,6 @@ export class Ui {
     this.activePuzzle = null
     const overlay = this.q<HTMLElement>('#puzzle-overlay')
     if (overlay) overlay.classList.add('is-hidden')
-    this.actions.resume()
     this.onPuzzleClosed?.()
   }
 

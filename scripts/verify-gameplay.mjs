@@ -44,9 +44,21 @@ async function run() {
   if (!l1Solved) throw new Error('Level 1 failed to register as solved!')
   console.log('   ✓ Level 1 (Paint Mixing) solved and recorded!')
 
-  // Close workbench
-  await page.locator('[data-action="puzzle-close"]').click()
+  // Click "Proceed to Next Station →" to close workbench and return to studio
+  await page.locator('[data-action="puzzle-submit"]').click()
   await page.waitForFunction(() => document.querySelector('#puzzle-overlay')?.classList.contains('is-hidden'))
+
+  // Verify that mouse is not stuck and can view 360 degrees
+  const beforeYaw = await page.evaluate(() => window.__game.game.player.yaw)
+  await page.evaluate(() => {
+    window.dispatchEvent(new MouseEvent('mousemove', { movementX: 120, movementY: 0, bubbles: true }))
+  })
+  await page.waitForTimeout(60)
+  const afterYaw = await page.evaluate(() => window.__game.game.player.yaw)
+  const isPlaying = await page.evaluate(() => window.__game.game.mode === 'playing')
+  if (!isPlaying) throw new Error('Game was paused unexpectedly after closing installation 1!')
+  if (Math.abs(afterYaw - beforeYaw) < 0.05) throw new Error(`Mouse look is stuck after installation 1 (${beforeYaw} -> ${afterYaw})!`)
+  console.log(`   ✓ 360° Mouse look verified active after Installation 1 (${beforeYaw.toFixed(2)} -> ${afterYaw.toFixed(2)})`)
 
   // Check objective banner updated to Station 2
   const obj2 = await page.locator('.hud-objective-text').innerText()
