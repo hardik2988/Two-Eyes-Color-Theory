@@ -4,11 +4,12 @@
  */
 export type Locale = 'en' | 'zh-CN'
 export type Quality = 'low' | 'medium' | 'high' | 'ultra'
+export type Perspective = 'jack' | 'john'
 
 export type ScoreEntry = { name: string; score: number; seconds: number; at: number }
 
 export type SaveData = {
-  version: 1
+  version: 2
   /** '' = never chosen; the game follows the browser language until the player picks one. */
   locale: Locale | ''
   musicVolume: number
@@ -21,6 +22,12 @@ export type SaveData = {
   tutorialDone: boolean
   playerName: string
   leaderboard: ScoreEntry[]
+  // Two Eyes Stage 4/5 additions:
+  currentPuzzle: number
+  puzzlesCompleted: number[]
+  perspective: Perspective
+  timerRemaining: number
+  untimedMode: boolean
 }
 
 export const SAVE_KEY = 'game3d.save'
@@ -28,7 +35,7 @@ export const LEADERBOARD_SIZE = 10
 
 export function defaultSave(): SaveData {
   return {
-    version: 1,
+    version: 2,
     locale: '',
     musicVolume: 0.7,
     sfxVolume: 0.8,
@@ -40,12 +47,18 @@ export function defaultSave(): SaveData {
     tutorialDone: false,
     playerName: 'PLAYER',
     leaderboard: [],
+    currentPuzzle: 1,
+    puzzlesCompleted: [],
+    perspective: 'jack',
+    timerRemaining: 900,
+    untimedMode: false,
   }
 }
 
-const clamp01 = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback)
+const clamp01 = (v: unknown, fallback: number) =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback
 
-/** Parse untrusted stored JSON into a valid SaveData (pure; unit tested). */
+/** Parse untrusted stored JSON into a valid SaveData (pure; unit tested). Migrates version 1 to 2. */
 export function parseSave(raw: string | null): SaveData {
   const base = defaultSave()
   if (!raw) return base
@@ -57,30 +70,79 @@ export function parseSave(raw: string | null): SaveData {
   } catch {
     return base
   }
-  if (data.version !== 1) return base
+  // Support version 1 and 2; reject invalid future versions
+  if (data.version !== 1 && data.version !== 2) return base
+
   const board = Array.isArray(data.leaderboard) ? data.leaderboard : []
+  const puzzlesCompleted = Array.isArray(data.puzzlesCompleted)
+    ? (data.puzzlesCompleted as unknown[]).filter((n): n is number => typeof n === 'number' && n >= 1 && n <= 4)
+    : []
+
+  // Perspective migration (handle legacy 'aria' / 'kai')
+  let perspective: Perspective = 'jack'
+  if (data.perspective === 'john' || data.perspective === 'kai') {
+    perspective = 'john'
+  }
+
+  const currentPuzzle =
+    typeof data.currentPuzzle === 'number' && data.currentPuzzle >= 1 && data.currentPuzzle <= 4
+      ? data.currentPuzzle
+      : base.currentPuzzle
+
+  const timerRemaining =
+    typeof data.timerRemaining === 'number' && data.timerRemaining >= 0 && data.timerRemaining <= 1800
+      ? data.timerRemaining
+      : base.timerRemaining
+
   return {
-    version: 1,
+    version: 2,
     locale: data.locale === 'en' || data.locale === 'zh-CN' ? data.locale : '',
     musicVolume: clamp01(data.musicVolume, base.musicVolume),
     sfxVolume: clamp01(data.sfxVolume, base.sfxVolume),
     muted: data.muted === true,
-    sensitivity: typeof data.sensitivity === 'number' && data.sensitivity >= 0.2 && data.sensitivity <= 3 ? data.sensitivity : base.sensitivity,
+    sensitivity:
+      typeof data.sensitivity === 'number' && data.sensitivity >= 0.2 && data.sensitivity <= 3
+        ? data.sensitivity
+        : base.sensitivity,
     invertY: data.invertY === true,
-    quality: data.quality === 'low' || data.quality === 'medium' || data.quality === 'high' || data.quality === 'ultra' ? data.quality : base.quality,
+    quality:
+      data.quality === 'low' || data.quality === 'medium' || data.quality === 'high' || data.quality === 'ultra'
+        ? data.quality
+        : base.quality,
     reducedMotion: data.reducedMotion === true,
     tutorialDone: data.tutorialDone === true,
-    playerName: typeof data.playerName === 'string' && data.playerName.trim() ? data.playerName.trim().slice(0, 16) : base.playerName,
+    playerName:
+      typeof data.playerName === 'string' && data.playerName.trim()
+        ? data.playerName.trim().slice(0, 16)
+        : base.playerName,
     leaderboard: board
-      .filter((e): e is ScoreEntry => !!e && typeof e === 'object' && typeof (e as ScoreEntry).name === 'string' && Number.isFinite((e as ScoreEntry).score))
-      .map(e => ({ name: e.name.slice(0, 16), score: Math.max(0, Math.floor(e.score)), seconds: Number.isFinite(e.seconds) ? e.seconds : 0, at: Number.isFinite(e.at) ? e.at : 0 }))
+      .filter(
+        (e): e is ScoreEntry =>
+          !!e &&
+          typeof e === 'object' &&
+          typeof (e as ScoreEntry).name === 'string' &&
+          Number.isFinite((e as ScoreEntry).score),
+      )
+      .map(e => ({
+        name: e.name.slice(0, 16),
+        score: Math.max(0, Math.floor(e.score)),
+        seconds: Number.isFinite(e.seconds) ? e.seconds : 0,
+        at: Number.isFinite(e.at) ? e.at : 0,
+      }))
       .slice(0, LEADERBOARD_SIZE),
+    currentPuzzle,
+    puzzlesCompleted,
+    perspective,
+    timerRemaining,
+    untimedMode: data.untimedMode === true,
   }
 }
 
 /** Insert a run into a bounded, deterministically ordered leaderboard (higher score, then faster, then earlier). */
 export function insertScore(board: ScoreEntry[], entry: ScoreEntry): { board: ScoreEntry[]; rank: number } {
-  const next = [...board, entry].sort((a, b) => b.score - a.score || a.seconds - b.seconds || a.at - b.at).slice(0, LEADERBOARD_SIZE)
+  const next = [...board, entry]
+    .sort((a, b) => b.score - a.score || a.seconds - b.seconds || a.at - b.at)
+    .slice(0, LEADERBOARD_SIZE)
   return { board: next, rank: next.indexOf(entry) }
 }
 

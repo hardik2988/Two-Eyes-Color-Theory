@@ -7,7 +7,7 @@ import type { Compass, Hint } from '../game/game'
 import type { Perspective } from '../game/first-person'
 import { formatClock, stars, type RunState } from '../game/rules'
 
-export type Screen = 'boot' | 'title' | 'hud' | 'pause' | 'settings' | 'leaderboard' | 'results'
+export type Screen = 'boot' | 'title' | 'hud' | 'pause' | 'settings' | 'leaderboard' | 'results' | 'puzzle'
 
 export type UiActions = {
   play(): void
@@ -15,6 +15,7 @@ export type UiActions = {
   restart(): void
   quit(): void
   settings(patch: Partial<SaveData>): void
+  puzzleAction?(action: string, payload?: unknown): void
 }
 
 const ICON = {
@@ -47,7 +48,7 @@ export class Ui {
   private savedRank = -1
   private stormShown = false
   private lastMethod = ''
-  private activePerspective: Perspective = 'aria'
+  private activePerspective: Perspective = 'jack'
 
   constructor(
     private readonly i18n: I18n,
@@ -76,6 +77,12 @@ export class Ui {
   show(screen: Screen): void {
     this.stack.length = 0
     this.setScreen(screen)
+  }
+
+  showCompletion(remainingFormatted: string): void {
+    const timeEl = this.root.querySelector<HTMLElement>('.modal-completion .r-time')
+    if (timeEl) timeEl.textContent = remainingFormatted
+    this.show('results')
   }
 
   /** Open an overlay screen (settings, leaderboard) that returns to the current one on Back. */
@@ -114,21 +121,35 @@ export class Ui {
     bar.style.transform = `scaleX(${Math.max(0.04, Math.min(1, progress))})`
   }
 
-  updateStudioHud(target: { label: string; detail: string } | null, note: string, showControls: boolean, perspective: Perspective): void {
+  updateStudioHud(
+    target: { label: string; detail: string } | null,
+    note: string,
+    showControls: boolean,
+    perspective: Perspective,
+    timerFormatted?: string,
+  ): void {
     this.activePerspective = perspective
     const view = this.q<HTMLElement>('.studio-vision')
-    if (view.dataset.view !== perspective) {
+    if (view && view.dataset.view !== perspective) {
       view.dataset.view = perspective
       view.setAttribute('aria-label', this.i18n.t(`studio.vision.${perspective}`))
     }
     const prompt = this.q<HTMLElement>('.studio-interact')
-    prompt.hidden = target === null
-    if (target) this.q('.studio-interact-label').textContent = target.label
+    if (prompt) {
+      prompt.hidden = target === null
+      if (target) this.q('.studio-interact-label').textContent = target.label
+    }
     const help = this.q<HTMLElement>('.studio-controls')
-    help.hidden = !showControls
+    if (help) help.hidden = !showControls
     const notice = this.q<HTMLElement>('.studio-note')
-    notice.hidden = !note
-    if (notice.textContent !== note) notice.textContent = note
+    if (notice) {
+      notice.hidden = !note
+      if (notice.textContent !== note) notice.textContent = note
+    }
+    if (timerFormatted) {
+      const clock = this.root.querySelector<HTMLElement>('.hud-timer-clock')
+      if (clock && clock.textContent !== timerFormatted) clock.textContent = timerFormatted
+    }
   }
 
   // ─── HUD ────────────────────────────────────────────────────────────────
@@ -294,7 +315,7 @@ export class Ui {
     this.q<HTMLInputElement>('[name="sfxVolume"]').value = String(d.sfxVolume)
     this.q<HTMLInputElement>('[name="sensitivity"]').value = String(d.sensitivity)
     for (const t of this.qa<HTMLButtonElement>('.toggle')) {
-      const on = d[t.dataset.setting as 'muted' | 'invertY' | 'reducedMotion'] === true
+      const on = d[t.dataset.setting as 'muted' | 'invertY' | 'reducedMotion' | 'untimedMode'] === true
       t.setAttribute('aria-pressed', String(on))
       t.querySelector('span')!.setAttribute('data-i18n', on ? 'settings.on' : 'settings.off')
     }
@@ -314,7 +335,7 @@ export class Ui {
     if (!target) return
     this.audio.unlock()
     if (target.matches('.toggle')) {
-      const key = target.dataset.setting as 'muted' | 'invertY' | 'reducedMotion'
+      const key = target.dataset.setting as 'muted' | 'invertY' | 'reducedMotion' | 'untimedMode'
       this.actions.settings({ [key]: !this.save.data[key] })
       this.refreshSettings()
       this.audio.play('ui')
@@ -569,10 +590,10 @@ export class Ui {
         </div>
       </div>
       <aside class="studio-card glass-panel">
-        <div class="studio-card-top"><span class="studio-status-dot"></span><span data-i18n="home.cardKicker"></span><span class="studio-card-index">03 / 04</span></div>
+        <div class="studio-card-top"><span class="studio-status-dot"></span><span data-i18n="home.cardKicker"></span><span class="studio-card-index">04 / 04</span></div>
         <h2 data-i18n="home.cardTitle"></h2>
         <p data-i18n="home.cardCopy"></p>
-        <div class="perspective-list"><div><span class="perspective-index">A</span><span><b data-i18n="home.ariaName"></b><small data-i18n="home.ariaView"></small></span><span class="view-mark view-mark-open">◉</span></div><div><span class="perspective-index">K</span><span><b data-i18n="home.kaiName"></b><small data-i18n="home.kaiView"></small></span><span class="view-mark view-mark-hatch">▧</span></div></div>
+        <div class="perspective-list"><div><span class="perspective-index">J</span><span><b data-i18n="home.jackName"></b><small data-i18n="home.jackView"></small></span><span class="view-mark view-mark-open">●</span></div><div><span class="perspective-index">J</span><span><b data-i18n="home.johnName"></b><small data-i18n="home.johnView"></small></span><span class="view-mark view-mark-hatch">▧</span></div></div>
         <div class="studio-card-rule"><span data-i18n="home.cardFoot"></span><span>⌁</span></div>
         <div class="title-best is-hidden" aria-live="polite"></div>
       </aside>
@@ -588,12 +609,23 @@ export class Ui {
   <header class="studio-hud-top">
     <div class="studio-hud-left">
       <div class="studio-objective glass-panel"><span class="studio-objective-kicker" data-i18n="studio.stage"></span><strong data-i18n="studio.objective"></strong><p data-i18n="studio.objectiveCopy"></p></div>
-      <aside class="studio-vision glass-panel" data-view="aria" role="status" aria-live="polite" aria-atomic="true">
+      <aside class="studio-vision glass-panel" data-view="jack" role="status" aria-live="polite" aria-atomic="true">
         <span class="studio-vision-symbol" aria-hidden="true"></span>
-        <span class="studio-vision-copy"><strong class="vision-aria" data-i18n="studio.vision.aria"></strong><strong class="vision-kai" data-i18n="studio.vision.kai"></strong><small data-i18n="studio.visionHint"></small><em data-i18n="studio.visionDisclaimer"></em></span>
+        <span class="studio-vision-copy">
+          <strong class="vision-jack vision-aria" data-i18n="studio.vision.jack"></strong>
+          <strong class="vision-john vision-kai" data-i18n="studio.vision.john"></strong>
+          <small data-i18n="studio.visionHint"></small>
+          <em data-i18n="studio.visionDisclaimer"></em>
+        </span>
       </aside>
     </div>
-    <button class="hud-pause" data-action="pause" data-i18n-label="touch.pause">${ICON.pause}</button>
+    <div class="studio-hud-right">
+      <div class="hud-timer-badge">
+        <span class="hud-timer-label">EXHIBITION TIME</span>
+        <strong class="hud-timer-clock">15:00</strong>
+      </div>
+      <button class="hud-pause" data-action="pause" data-i18n-label="touch.pause">${ICON.pause}</button>
+    </div>
   </header>
   <div class="studio-crosshair" aria-hidden="true"><i></i><b></b></div>
   <div class="studio-interact glass-panel" hidden aria-live="polite"><kbd>E</kbd><span><b class="studio-interact-label"></b><small data-i18n="studio.pressToExamine"></small></span></div>
@@ -636,6 +668,7 @@ export class Ui {
           <button data-nav data-value="low" data-i18n="settings.quality.low"></button><button data-nav data-value="medium" data-i18n="settings.quality.medium"></button><button data-nav data-value="high" data-i18n="settings.quality.high"></button><button data-nav data-value="ultra" data-i18n="settings.quality.ultra"></button>
         </div></div>
         ${toggle('reducedMotion', 'settings.reducedMotion')}
+        ${toggle('untimedMode', 'settings.untimed')}
       </fieldset>
     </div>
     <nav class="menu menu-row"><button data-nav class="btn" data-action="back"><span data-i18n="menu.back"></span></button></nav>
@@ -654,27 +687,52 @@ export class Ui {
 </section>
 
 <section class="screen screen-results screen-modal" data-screen="results">
-  <div class="modal modal-results">
-    <div class="results-stars">${`<span class="star">${ICON.star}</span>`.repeat(3)}</div>
-    <h2 class="results-title modal-title"></h2>
-    <div class="results-best" data-i18n="results.newBest"></div>
-    <dl class="results-table">
-      <div><dt data-i18n="results.cores"></dt><dd class="r-cores"></dd><dd class="r-core-score"></dd></div>
-      <div><dt data-i18n="results.time"></dt><dd class="r-time"></dd><dd></dd></div>
-      <div class="r-bonus"><dt data-i18n="results.timeBonus"></dt><dd></dd><dd class="r-time-bonus"></dd></div>
-      <div class="r-bonus"><dt data-i18n="results.lifeBonus"></dt><dd></dd><dd class="r-life-bonus"></dd></div>
-      <div class="r-total-row"><dt data-i18n="results.total"></dt><dd></dd><dd class="r-total"></dd></div>
-    </dl>
-    <div class="results-save">
-      <input data-nav class="results-name" type="text" maxlength="16" autocomplete="off" spellcheck="false" data-i18n-placeholder="results.name">
-      <button data-nav class="btn btn-small" data-action="save-score"><span data-i18n="results.save"></span></button>
-      <span class="results-saved" data-i18n="results.saved"></span>
-      <span class="results-rank"></span>
+  <div class="modal modal-wide modal-completion">
+    <h2 class="results-title modal-title" data-i18n="results.won"></h2>
+    <div class="completion-banner">
+      <p class="completion-quote">“Colour is only one part of communication. Great design works for everyone.”</p>
     </div>
-    <nav class="menu menu-row">
+    <div class="completion-recap">
+      <div class="recap-item">
+        <b>1. Subtractive Light Absorption</b>
+        <p>Physical pigments absorb light wavelengths: Blue + Yellow = Green. Never confuse pigment mixing with additive RGB screen light.</p>
+      </div>
+      <div class="recap-item">
+        <b>2. Value (Luminance) Contrast</b>
+        <p>Luminance contrast remains 100% legible across all color vision types. Tint adds white, tone adds grey, and shade adds black.</p>
+      </div>
+      <div class="recap-item">
+        <b>3. Geometric Colour Harmonies</b>
+        <p>Harmonies represent geometric angular relationships on the color wheel: monochromatic, analogous (30°), complementary (180°), and split-complementary.</p>
+      </div>
+      <div class="recap-item">
+        <b>4. Multi-Channel Dual Encoding</b>
+        <p>Never rely on colour alone: combine hue with shapes, hatching patterns, contrast, and explicit tactile cues.</p>
+      </div>
+    </div>
+    <div class="row" style="margin: 16px 0; justify-content: space-around;">
+      <div><span style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Remaining Time:</span> <b class="r-time" style="font-size: 18px; color: var(--deep-space-blue); margin-left: 6px;">15:00</b></div>
+      <div><span style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Installations Unlocked:</span> <b style="font-size: 18px; color: var(--brick-red); margin-left: 6px;">4 / 4</b></div>
+    </div>
+    <nav class="menu menu-row" style="margin-top: 20px;">
       <button data-nav class="btn btn-primary" data-action="restart"><span data-i18n="results.retry"></span></button>
       <button data-nav class="btn" data-action="quit"><span data-i18n="results.title"></span></button>
     </nav>
+  </div>
+</section>
+
+<section class="screen screen-puzzle screen-modal" data-screen="puzzle">
+  <div class="puzzle-dialog-panel glass-panel">
+    <div class="puzzle-header">
+      <span class="puzzle-kicker"></span>
+      <h2 class="puzzle-title"></h2>
+      <p class="puzzle-desc"></p>
+    </div>
+    <div class="puzzle-body" id="puzzle-mount"></div>
+    <div class="puzzle-actions">
+      <button data-nav class="btn btn-quiet" data-action="puzzle-close">Back to Studio</button>
+      <button data-nav class="btn btn-primary" data-action="puzzle-submit">Test Solution</button>
+    </div>
   </div>
 </section>`
   }

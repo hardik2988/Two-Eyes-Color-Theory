@@ -3,16 +3,19 @@ import { RAPIER, type Physics } from '../engine/physics'
 import { CONFIG } from './config'
 
 export type WalkInput = { x: number; y: number; sprint: boolean }
-export type Perspective = 'aria' | 'kai'
+export type Perspective = 'jack' | 'john'
+export type AnyPerspective = Perspective | 'aria' | 'kai'
 export type CameraViewOffset = Readonly<{ eye: number; side: number }>
 
-export const CAMERA_VIEW_OFFSETS: Record<Perspective, CameraViewOffset> = {
+export const CAMERA_VIEW_OFFSETS: Record<AnyPerspective, CameraViewOffset> = {
+  jack: { eye: 0, side: -0.075 },
+  john: { eye: -0.11, side: 0.075 },
   aria: { eye: 0, side: -0.075 },
   kai: { eye: -0.11, side: 0.075 },
 }
 
-export function cameraViewOffset(perspective: Perspective): CameraViewOffset {
-  return CAMERA_VIEW_OFFSETS[perspective]
+export function cameraViewOffset(perspective: AnyPerspective): CameraViewOffset {
+  return CAMERA_VIEW_OFFSETS[perspective] ?? CAMERA_VIEW_OFFSETS.jack
 }
 
 /** Pure movement mapping shared by the controller and its orientation tests. */
@@ -38,10 +41,10 @@ export class FirstPersonController {
   pitch = -0.14
   private readonly velocity = new THREE.Vector3()
   private readonly eyeHeight = CONFIG.exploration.eyeHeight
-  private eyeOffset = CAMERA_VIEW_OFFSETS.aria.eye
-  private sideOffset = CAMERA_VIEW_OFFSETS.aria.side
-  private targetEyeOffset = CAMERA_VIEW_OFFSETS.aria.eye
-  private targetSideOffset = CAMERA_VIEW_OFFSETS.aria.side
+  private eyeOffset = CAMERA_VIEW_OFFSETS.jack.eye
+  private sideOffset = CAMERA_VIEW_OFFSETS.jack.side
+  private targetEyeOffset = CAMERA_VIEW_OFFSETS.jack.eye
+  private targetSideOffset = CAMERA_VIEW_OFFSETS.jack.side
 
   constructor(private readonly physics: Physics, spawn: THREE.Vector3, aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, aspect, 0.06, 45)
@@ -102,11 +105,11 @@ export class FirstPersonController {
     this.velocity.set(0, 0, 0)
     this.yaw = 0.14
     this.pitch = -0.14
-    this.setPerspective('aria', true)
+    this.setPerspective('jack', true)
     this.syncCamera()
   }
 
-  setPerspective(perspective: Perspective, reducedMotion = false): void {
+  setPerspective(perspective: AnyPerspective, reducedMotion = false): void {
     const offset = cameraViewOffset(perspective)
     this.targetEyeOffset = offset.eye
     this.targetSideOffset = offset.side

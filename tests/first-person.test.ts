@@ -16,9 +16,12 @@ describe('studio first-person controller', () => {
   })
 
   it('assigns distinguishable eye and shoulder viewpoints to both siblings', () => {
-    expect(cameraViewOffset('aria')).not.toEqual(cameraViewOffset('kai'))
-    expect(cameraViewOffset('kai').eye).toBeLessThan(cameraViewOffset('aria').eye)
-    expect(cameraViewOffset('kai').side).toBeGreaterThan(cameraViewOffset('aria').side)
+    expect(cameraViewOffset('jack')).not.toEqual(cameraViewOffset('john'))
+    expect(cameraViewOffset('john').eye).toBeLessThan(cameraViewOffset('jack').eye)
+    expect(cameraViewOffset('john').side).toBeGreaterThan(cameraViewOffset('jack').side)
+    // Backward compatibility aliases
+    expect(cameraViewOffset('aria')).toEqual(cameraViewOffset('jack'))
+    expect(cameraViewOffset('kai')).toEqual(cameraViewOffset('john'))
   })
 
   it('keeps the kinematic capsule on its side of a solid wall', async () => {
@@ -44,14 +47,14 @@ describe('studio first-person controller', () => {
     try {
       const bodyStart = player.position.clone()
       const cameraStart = player.camera.position.clone()
-      player.setPerspective('kai')
+      player.setPerspective('john')
       player.step(1 / 60, { x: 0, y: 0, sprint: false })
       const firstStep = player.camera.position.clone()
       expect(firstStep.distanceTo(cameraStart)).toBeGreaterThan(0.01)
       expect(firstStep.distanceTo(cameraStart)).toBeLessThan(0.3)
 
       for (let i = 0; i < 150; i += 1) player.step(1 / 60, { x: 0, y: 0, sprint: false })
-      expect(player.camera.position.y - player.position.y).toBeCloseTo(CONFIG.exploration.eyeHeight + cameraViewOffset('kai').eye, 2)
+      expect(player.camera.position.y - player.position.y).toBeCloseTo(CONFIG.exploration.eyeHeight + cameraViewOffset('john').eye, 2)
       expect(player.position.x).toBeCloseTo(bodyStart.x, 3)
       expect(player.position.z).toBeCloseTo(bodyStart.z, 3)
     } finally {

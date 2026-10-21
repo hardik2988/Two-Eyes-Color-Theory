@@ -5,7 +5,21 @@
  * The starter ships no audio files: SFX are synthesized and the music is a generative ambient
  * pad. To use recorded assets, `load(url)` an AudioBuffer and `playBuffer()` it on either bus.
  */
-export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash'
+export type Sfx =
+  | 'pickup'
+  | 'jump'
+  | 'land'
+  | 'hurt'
+  | 'ui'
+  | 'win'
+  | 'lose'
+  | 'dash'
+  | 'footstep'
+  | 'paint'
+  | 'frame'
+  | 'vault_bolt'
+  | 'puzzle_success'
+  | 'puzzle_fail'
 
 export class Audio {
   readonly ctx: AudioContext
@@ -78,6 +92,12 @@ export class Audio {
       case 'hurt': tone(220, 90, 0.28, 'sawtooth', 0.22); break
       case 'ui': tone(660, 700, 0.06, 'triangle', 0.18); break
       case 'dash': tone(500, 180, 0.18, 'sawtooth', 0.1); break
+      case 'footstep': tone(140, 60, 0.04, 'sine', 0.08); break
+      case 'paint': tone(440, 580, 0.14, 'sine', 0.18); tone(580, 720, 0.12, 'triangle', 0.14, 0.05); break
+      case 'frame': tone(220, 140, 0.12, 'triangle', 0.22); break
+      case 'vault_bolt': [130, 95, 65].forEach((f, i) => tone(f, f * 0.9, 0.35, 'sawtooth', 0.22, i * 0.08)); break
+      case 'puzzle_success': [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, 0.35, 'triangle', 0.26, i * 0.09)); break
+      case 'puzzle_fail': [349, 311].forEach((f, i) => tone(f, f * 0.96, 0.28, 'sine', 0.2, i * 0.07)); break
       case 'win': [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, 0.3, 'triangle', 0.25, i * 0.11)); break
       case 'lose': [392, 330, 262].forEach((f, i) => tone(f, f * 0.98, 0.38, 'sine', 0.25, i * 0.16)); break
     }

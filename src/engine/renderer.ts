@@ -62,8 +62,8 @@ export class Renderer {
     return 1
   }
 
-  setVisionMode(mode: 'aria' | 'kai', reducedMotion = false): void {
-    this.visionTarget = mode === 'kai' ? 1 : 0
+  setVisionMode(mode: 'jack' | 'john' | 'aria' | 'kai', reducedMotion = false): void {
+    this.visionTarget = (mode === 'john' || mode === 'kai') ? 1 : 0
     if (reducedMotion) this.visionStrength_ = this.visionTarget
     this.visionPass.uniforms.uStrength.value = this.visionStrength_
   }

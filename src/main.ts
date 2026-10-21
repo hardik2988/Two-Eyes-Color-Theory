@@ -69,6 +69,7 @@ async function boot(): Promise<void> {
       applySettings(save.data)
       if (patch.locale) i18n.set(patch.locale)
       if (qualityChanged) game?.setQuality(save.data.quality)
+      if (patch.untimedMode !== undefined && game) game.timer.setUntimed(patch.untimedMode)
     },
   })
   ui.show('boot')
@@ -94,6 +95,12 @@ async function boot(): Promise<void> {
   const renderer = new Renderer(canvas, save.data.quality)
   game = new Game(renderer, input, audio)
   game.reducedMotion = save.data.reducedMotion
+  game.timer.setUntimed(save.data.untimedMode)
+  game.onComplete = remainingTime => {
+    input.setGameActive(false)
+    input.unlockPointer()
+    ui.showCompletion(remainingTime)
+  }
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([
       import('../scripts/manus-tuning/adapter.js'), import('./game/tuning'),
@@ -113,7 +120,7 @@ async function boot(): Promise<void> {
       ui.frame(frameSeconds)
       loop.paused = g.mode === 'paused'
       g.render(alpha, frameSeconds)
-      if (g.mode === 'playing') ui.updateStudioHud(g.focusedTarget, g.note, g.helpVisible, g.perspective)
+      if (g.mode === 'playing') ui.updateStudioHud(g.focusedTarget, g.note, g.helpVisible, g.perspective, g.timer.formatted)
     },
   })
   loop.start()
