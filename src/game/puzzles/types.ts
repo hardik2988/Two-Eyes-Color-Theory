@@ -20,4 +20,5 @@ export interface IPuzzle {
   isComplete: boolean
   reset(): void
   getHint(index: number): string
+  check(): PuzzleResult
 }

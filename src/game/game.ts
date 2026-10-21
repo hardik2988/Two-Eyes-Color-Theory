@@ -10,8 +10,9 @@ import { tuning } from './tuning'
 import { StudioWorld, type StudioTarget } from './studio-world'
 import { PuzzleManager } from './puzzles/puzzle-manager'
 import { CountdownTimer } from './timer'
+import type { IPuzzle } from './puzzles/types'
 
-export type Mode = 'attract' | 'playing' | 'paused' | 'ended'
+export type Mode = 'attract' | 'playing' | 'paused' | 'ended' | 'puzzle'
 export type Hint = 'move' | 'look' | 'jump' | 'dash' | 'cores'
 export type Compass = { angle: number; distance: number; rise: number }
 
@@ -30,6 +31,8 @@ export class Game {
   })
 
   onComplete?: (remainingTime: string) => void
+  onOpenPuzzle?: (puzzle: IPuzzle) => void
+  onPlayerMoved?: () => void
 
   private readonly physics: Physics
   private readonly world: StudioWorld
@@ -79,6 +82,22 @@ export class Game {
     return this.renderer.visionPassCount
   }
 
+  get currentObjective(): string {
+    if (this.vaultOpening || this.puzzles.vault.isComplete) {
+      return 'Exhibition Complete · Vault Unlocked · Walk inside to finish'
+    }
+    if (this.puzzles.harmonies.state === 'completed') {
+      return 'Installation 04: The Exhibition Vault · Decrypt Master Keypad'
+    }
+    if (this.puzzles.value.state === 'completed') {
+      return 'Installation 03: South Gallery Wall · Order Colour Harmonies'
+    }
+    if (this.puzzles.paintMixing.state === 'completed') {
+      return 'Installation 02: The Value Easel · Match Reference Tone'
+    }
+    return 'Installation 01: The Mixing Bench · Subtractive Pigment Mixing'
+  }
+
   start(showControls: boolean): void {
     tuning.activate('run')
     this.player.reset(this.world.spawn)
@@ -92,6 +111,7 @@ export class Game {
     this.mode = 'playing'
     this.vaultOpening = false
     this.vaultDoorProgress = 0
+    this.world.setObjectiveStation('paint-mixing')
     this.timer.start()
     this.input.endFrame()
     this.input.takeLook()
@@ -105,7 +125,7 @@ export class Game {
   }
 
   resume(): void {
-    if (this.mode !== 'paused') return
+    if (this.mode !== 'paused' && this.mode !== 'puzzle') return
     this.mode = 'playing'
     this.timer.resume()
     this.input.endFrame()
@@ -121,6 +141,7 @@ export class Game {
     this.helpVisible = false
     this.timer.stop()
     this.puzzles.resetAll()
+    this.world.setObjectiveStation('paint-mixing')
     this.player.reset(this.world.spawn)
   }
 
@@ -177,6 +198,7 @@ export class Game {
     // Footstep audio
     const isMoving = Math.abs(this.input.move.x) > 0.1 || Math.abs(this.input.move.y) > 0.1
     if (isMoving) {
+      this.onPlayerMoved?.()
       this.footstepAccumulator += dt
       const interval = this.input.held('sprint') ? 0.32 : 0.44
       if (this.footstepAccumulator >= interval) {
@@ -211,6 +233,8 @@ export class Game {
       this.player.look(this.input.takeLook())
       this.player.syncCamera()
       this.focusedTarget = this.findTarget()
+    } else if (this.mode === 'puzzle') {
+      this.player.syncCamera()
     } else if (this.mode === 'attract') {
       const camera = this.player.camera
       const sway = this.reducedMotion ? 0 : Math.sin(this.time * 0.16) * 0.08
@@ -230,11 +254,43 @@ export class Game {
     const roots = this.world.targets.map(target => target.object)
     const hits = this.raycaster.intersectObjects(roots, true)
     for (const hit of hits) {
-      if (hit.distance > 4.2) break
+      if (hit.distance > 5.8) break
       let current: THREE.Object3D | null = hit.object
       while (current) {
         const target = current.userData.interaction as StudioTarget | undefined
-        if (target) return target
+        if (target) {
+          // Dynamic interaction prompt label reflecting puzzle state
+          if (target.id === 'paint-tins') {
+            target.label = this.puzzles.paintMixing.isComplete
+              ? 'Paint tins · Installation 01 (Solved) [E]'
+              : 'Paint tins · Subtractive Mixing Bench [E to Mix]'
+          } else if (target.id === 'value-station') {
+            if (this.puzzles.paintMixing.state !== 'completed') {
+              target.label = 'Installation 02 · Value Easel [Locked · Complete Inst. 01 first]'
+            } else if (this.puzzles.value.isComplete) {
+              target.label = 'Installation 02 · Value Easel (Solved) [E]'
+            } else {
+              target.label = 'Installation 02 · The Value Easel [E to Examine]'
+            }
+          } else if (target.id === 'harmonies') {
+            if (this.puzzles.value.state !== 'completed') {
+              target.label = 'Installation 03 · Gallery Wall [Locked · Complete Inst. 02 first]'
+            } else if (this.puzzles.harmonies.isComplete) {
+              target.label = 'Installation 03 · Gallery Wall (Solved) [E]'
+            } else {
+              target.label = 'Installation 03 · Gallery Wall Harmonies [E to Arrange]'
+            }
+          } else if (target.id === 'vault-door') {
+            if (this.puzzles.harmonies.state !== 'completed') {
+              target.label = 'Installation 04 · Exhibition Vault [Locked · Solve Inst. 01–03 first]'
+            } else if (this.vaultOpening || this.puzzles.vault.isComplete) {
+              target.label = 'Installation 04 · Exhibition Vault (Open)'
+            } else {
+              target.label = 'Installation 04 · Exhibition Vault [E to Decrypt Keypad]'
+            }
+          }
+          return target
+        }
         current = current.parent
       }
     }
@@ -253,101 +309,45 @@ export class Game {
 
     // ─── Installation 01: Subtractive Paint Mixing ─────────────
     if (puzzleId === 'paint-mixing' || this.focusedTarget.id === 'paint-tins') {
-      if (this.puzzles.paintMixing.isComplete) {
-        this.note =
-          'The labels use a circle, triangle, square and diamond. Viridian Leaf Green blended through subtractive absorption. Proceed to Installation 02 at the Value Easel.'
-        this.noteTime = 6
-        this.audio.play('ui')
-        return
-      }
-
+      this.note = 'The labels use a circle, triangle, square and diamond. Opening Subtractive Mixing Bench...'
+      this.noteTime = 5
       this.audio.play('paint')
-      // Execute the subtractive mix
-      this.puzzles.paintMixing.selectPigment('ultramarine')
-      this.puzzles.paintMixing.selectPigment('cadmium-yellow')
-      const result = this.puzzles.paintMixing.check()
-
-      if (result.success) {
-        this.puzzles.syncStates()
-        this.note =
-          'The labels use a circle, triangle, square and diamond. Solved! Cobalt Blue (●) + Cadmium Lemon (▲) subtractively mixed into Viridian Leaf Green! Installation 02 unlocked.'
-        this.noteTime = 7
-        this.audio.play('puzzle_success')
-      }
+      this.onOpenPuzzle?.(this.puzzles.paintMixing)
       return
     }
 
     // ─── Installation 02: Value Easel ───────────────────────────
-    if (puzzleId === 'value') {
+    if (puzzleId === 'value' || this.focusedTarget.id === 'value-station') {
       if (this.puzzles.paintMixing.state !== 'completed') {
         this.note = 'Installation 02 is locked. Complete Installation 01 at the Mixing Bench first.'
         this.noteTime = 5
         this.audio.play('ui')
         return
       }
-      if (this.puzzles.value.isComplete) {
-        this.note =
-          'Installation 02 already solved: Tone accurately distinguished by luminance. Proceed to Installation 03 at the Gallery Wall.'
-        this.noteTime = 6
-        this.audio.play('ui')
-        return
-      }
-
+      this.note = 'Opening Installation 02: Value Easel Workstation...'
+      this.noteTime = 5
       this.audio.play('frame')
-      this.puzzles.value.selectSample('sample-tone')
-      const result = this.puzzles.value.check()
-
-      if (result.success) {
-        this.puzzles.syncStates()
-        this.note =
-          '★ Installation 02 Solved! Tone matched at 0.48 luminance (Hue + Grey). Installation 03 unlocked on the South Gallery Wall!'
-        this.noteTime = 7
-        this.audio.play('puzzle_success')
-      }
+      this.onOpenPuzzle?.(this.puzzles.value)
       return
     }
 
     // ─── Installation 03: Gallery Wall Harmonies ────────────────
-    if (puzzleId === 'harmonies') {
+    if (puzzleId === 'harmonies' || this.focusedTarget.id === 'harmonies') {
       if (this.puzzles.value.state !== 'completed') {
         this.note = 'Installation 03 is locked. Complete Installation 02 at the Value Easel first.'
         this.noteTime = 5
         this.audio.play('ui')
         return
       }
-      if (this.puzzles.harmonies.isComplete) {
-        this.note =
-          'Installation 03 already solved: Gallery paintings ordered into Monochromatic, Analogous, Complementary, Split-Complementary.'
-        this.noteTime = 6
-        this.audio.play('ui')
-        return
-      }
-
+      this.note = 'Opening Installation 03: Gallery Wall Harmonies...'
+      this.noteTime = 5
       this.audio.play('frame')
-      // Reorder into correct harmonic sequence
-      const mono = this.puzzles.harmonies.paintings.find(p => p.id === 'p-mono')!
-      const ana = this.puzzles.harmonies.paintings.find(p => p.id === 'p-ana')!
-      const comp = this.puzzles.harmonies.paintings.find(p => p.id === 'p-comp')!
-      const split = this.puzzles.harmonies.paintings.find(p => p.id === 'p-split')!
-
-      mono.slot = 0
-      ana.slot = 1
-      comp.slot = 2
-      split.slot = 3
-
-      const result = this.puzzles.harmonies.check()
-      if (result.success) {
-        this.puzzles.syncStates()
-        this.note =
-          '★ Installation 03 Solved! Four harmonic relationships verified on the colour wheel. The Exit Vault power is active!'
-        this.noteTime = 7
-        this.audio.play('puzzle_success')
-      }
+      this.onOpenPuzzle?.(this.puzzles.harmonies)
       return
     }
 
     // ─── Installation 04: The Exit Vault ────────────────────────
-    if (puzzleId === 'vault') {
+    if (puzzleId === 'vault' || this.focusedTarget.id === 'vault-door') {
       if (this.puzzles.harmonies.state !== 'completed') {
         this.note =
           'The Exit Vault is locked. Complete Installations 01, 02, and 03 first to energize the keypad mechanism.'
@@ -355,29 +355,15 @@ export class Game {
         this.audio.play('ui')
         return
       }
-      if (this.puzzles.vault.isComplete || this.vaultOpening) {
-        this.note = 'The vault is opening! Preparing the exhibition completion...'
+      if (this.vaultOpening || this.puzzles.vault.isComplete) {
+        this.note = 'The vault is open! Walk through the threshold to complete the exhibition.'
         this.noteTime = 4
         return
       }
-
-      // Enter decoded dual-vision code: Jack's chromatic digits (4829) in John's positional order (Circle, Triangle, Square, Diamond)
+      this.note = 'Accessing Installation 04: Vault Keypad...'
+      this.noteTime = 5
       this.audio.play('vault_bolt')
-      this.puzzles.vault.clearKey()
-      this.puzzles.vault.pressKey('4')
-      this.puzzles.vault.pressKey('8')
-      this.puzzles.vault.pressKey('2')
-      this.puzzles.vault.pressKey('9')
-      const result = this.puzzles.vault.check()
-
-      if (result.success) {
-        this.puzzles.syncStates()
-        this.vaultOpening = true
-        this.note =
-          '★ VAULT CODE 4829 VERIFIED! Dual-perspective communication successful. Locking bolts rotating open...'
-        this.noteTime = 8
-        this.audio.play('win')
-      }
+      this.onOpenPuzzle?.(this.puzzles.vault)
       return
     }
 
@@ -385,6 +371,32 @@ export class Game {
     this.note = this.focusedTarget.detail
     this.noteTime = 7
     this.audio.play('ui')
+  }
+
+  onPuzzleSolved(puzzleId: string): void {
+    this.puzzles.syncStates()
+    this.audio.play('puzzle_success')
+
+    if (puzzleId === 'paint-mixing') {
+      this.world.setObjectiveStation('value')
+      this.world.setPaletteMixedColor('#15803d')
+      this.note = '★ Installation 01 Solved! Viridian Leaf Green mixed. Proceed to Installation 02 at the Value Easel.'
+      this.noteTime = 7
+    } else if (puzzleId === 'value') {
+      this.world.setObjectiveStation('harmonies')
+      this.note = '★ Installation 02 Solved! Tone matched at 0.48 luminance. Proceed to Installation 03 at the South Gallery Wall.'
+      this.noteTime = 7
+    } else if (puzzleId === 'harmonies') {
+      this.world.setObjectiveStation('vault')
+      this.note = '★ Installation 03 Solved! Four harmonic chords aligned. Proceed to Installation 04 at the Exit Vault.'
+      this.noteTime = 7
+    } else if (puzzleId === 'vault') {
+      this.vaultOpening = true
+      this.world.setObjectiveStation('completed')
+      this.note = '★ Vault Code 4829 Verified! Locking bolts rotating open...'
+      this.noteTime = 8
+      this.audio.play('win')
+    }
   }
 
   private showCurrentHint(): void {

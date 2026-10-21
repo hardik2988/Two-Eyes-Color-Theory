@@ -6,6 +6,11 @@ import { CONFIG } from '../game/config'
 import type { Compass, Hint } from '../game/game'
 import type { Perspective } from '../game/first-person'
 import { formatClock, stars, type RunState } from '../game/rules'
+import type { IPuzzle } from '../game/puzzles/types'
+import { PaintMixingPuzzle, STUDIO_PIGMENTS, mixPigments } from '../game/puzzles/paint-mixing'
+import { ValuePuzzle } from '../game/puzzles/value-puzzle'
+import { HarmonyPuzzle } from '../game/puzzles/harmony-puzzle'
+import { VaultPuzzle } from '../game/puzzles/vault-puzzle'
 
 export type Screen = 'boot' | 'title' | 'hud' | 'pause' | 'settings' | 'leaderboard' | 'results' | 'puzzle'
 
@@ -16,6 +21,7 @@ export type UiActions = {
   quit(): void
   settings(patch: Partial<SaveData>): void
   puzzleAction?(action: string, payload?: unknown): void
+  closePuzzle?(): void
 }
 
 const ICON = {
@@ -92,9 +98,39 @@ export class Ui {
   }
 
   back(): void {
+    if (this.isPuzzleOpen) {
+      this.closePuzzle()
+      return
+    }
     const prev = this.stack.pop()
     if (prev) this.setScreen(prev)
     else if (this.screen === 'pause') this.actions.resume()
+  }
+
+  activePuzzle: IPuzzle | null = null
+  onPuzzleSolved?: (puzzleId: string) => void
+  onPuzzleClosed?: () => void
+
+  get isPuzzleOpen(): boolean {
+    const overlay = this.root.querySelector<HTMLElement>('#puzzle-overlay')
+    return Boolean(overlay && !overlay.classList.contains('is-hidden') && this.activePuzzle)
+  }
+
+  openPuzzle(puzzle: IPuzzle, perspective: Perspective): void {
+    this.activePuzzle = puzzle
+    this.activePerspective = perspective
+    this.renderPuzzleDialog()
+    const overlay = this.q<HTMLElement>('#puzzle-overlay')
+    if (overlay) overlay.classList.remove('is-hidden')
+    document.exitPointerLock?.()
+  }
+
+  closePuzzle(): void {
+    this.activePuzzle = null
+    const overlay = this.q<HTMLElement>('#puzzle-overlay')
+    if (overlay) overlay.classList.add('is-hidden')
+    this.actions.resume()
+    this.onPuzzleClosed?.()
   }
 
   private setScreen(screen: Screen): void {
@@ -127,6 +163,7 @@ export class Ui {
     showControls: boolean,
     perspective: Perspective,
     timerFormatted?: string,
+    objectiveText?: string,
   ): void {
     this.activePerspective = perspective
     const view = this.q<HTMLElement>('.studio-vision')
@@ -149,6 +186,12 @@ export class Ui {
     if (timerFormatted) {
       const clock = this.root.querySelector<HTMLElement>('.hud-timer-clock')
       if (clock && clock.textContent !== timerFormatted) clock.textContent = timerFormatted
+    }
+    if (objectiveText) {
+      const objEl = this.root.querySelector<HTMLElement>('.hud-objective-text')
+      if (objEl && objEl.textContent !== objectiveText) objEl.textContent = objectiveText
+      const studioObjP = this.root.querySelector<HTMLElement>('.studio-objective p')
+      if (studioObjP && studioObjP.textContent !== objectiveText) studioObjP.textContent = objectiveText
     }
   }
 
@@ -331,6 +374,74 @@ export class Ui {
   // ─── events ─────────────────────────────────────────────────────────────
 
   private onClick(e: MouseEvent): void {
+    // Interactive Puzzle Controls Routing
+    const pigmentBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-pigment]')
+    if (pigmentBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
+      const pid = pigmentBtn.dataset.pigment!
+      this.activePuzzle.selectPigment(pid)
+      this.audio.play('paint')
+      this.renderPuzzleDialog()
+      return
+    }
+
+    const clearBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="clear-palette"]')
+    if (clearBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
+      this.activePuzzle.clearSelection()
+      this.audio.play('ui')
+      this.renderPuzzleDialog()
+      return
+    }
+
+    const valueBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-sample]')
+    if (valueBtn && this.activePuzzle instanceof ValuePuzzle) {
+      const sid = valueBtn.dataset.sample!
+      this.activePuzzle.selectSample(sid)
+      this.audio.play('frame')
+      this.renderPuzzleDialog()
+      return
+    }
+
+    const swapBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-swap-dir]')
+    if (swapBtn && this.activePuzzle instanceof HarmonyPuzzle) {
+      const dir = Number(swapBtn.dataset.swapDir)
+      const slot = Number(swapBtn.dataset.slot)
+      const targetSlot = slot + dir
+      if (targetSlot >= 0 && targetSlot <= 3) {
+        const p1 = this.activePuzzle.paintings.find(p => p.slot === slot)
+        const p2 = this.activePuzzle.paintings.find(p => p.slot === targetSlot)
+        if (p1 && p2) {
+          p1.slot = targetSlot
+          p2.slot = slot
+          this.audio.play('frame')
+          this.renderPuzzleDialog()
+        }
+      }
+      return
+    }
+
+    const vaultBtn = (e.target as HTMLElement).closest<HTMLElement>('.vault-key')
+    if (vaultBtn && this.activePuzzle instanceof VaultPuzzle) {
+      const key = vaultBtn.dataset.key!
+      if (key === 'clear') this.activePuzzle.clearKey()
+      else if (key === 'backspace') this.activePuzzle.deleteKey()
+      else this.activePuzzle.pressKey(key)
+      this.audio.play('ui')
+      this.renderPuzzleDialog()
+      return
+    }
+
+    const puzzleCloseBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="puzzle-close"]')
+    if (puzzleCloseBtn) {
+      this.closePuzzle()
+      return
+    }
+
+    const puzzleSubmitBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="puzzle-submit"]')
+    if (puzzleSubmitBtn) {
+      this.testPuzzleSolution()
+      return
+    }
+
     const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action], .toggle, .seg button')
     if (!target) return
     this.audio.unlock()
@@ -525,6 +636,276 @@ export class Ui {
     return [...this.root.querySelectorAll<T>(sel)]
   }
 
+  private renderPuzzleDialog(): void {
+    if (!this.activePuzzle) return
+    const p = this.activePuzzle
+    const kicker = this.q<HTMLElement>('.puzzle-kicker')
+    const title = this.q<HTMLElement>('.puzzle-title')
+    const desc = this.q<HTMLElement>('.puzzle-desc')
+    const mount = document.getElementById('puzzle-mount')
+    const submitBtn = this.q<HTMLButtonElement>('[data-action="puzzle-submit"]')
+
+    if (kicker) kicker.textContent = p.subtitle
+    if (title) title.textContent = p.title
+    if (desc) desc.textContent = p.description
+    if (submitBtn) {
+      if (p.isComplete) {
+        submitBtn.textContent = 'Proceed to Next Station →'
+        submitBtn.classList.add('btn-success')
+      } else {
+        submitBtn.textContent = 'Test Solution'
+        submitBtn.classList.remove('btn-success')
+      }
+    }
+
+    if (!mount) return
+
+    if (p.id === 'paint-mixing') {
+      this.renderPaintMixingPuzzle(mount, p as PaintMixingPuzzle)
+    } else if (p.id === 'value') {
+      this.renderValuePuzzle(mount, p as ValuePuzzle)
+    } else if (p.id === 'harmonies') {
+      this.renderHarmonyPuzzle(mount, p as HarmonyPuzzle)
+    } else if (p.id === 'vault') {
+      this.renderVaultPuzzle(mount, p as VaultPuzzle)
+    }
+  }
+
+  private renderPaintMixingPuzzle(mount: HTMLElement, puzzle: PaintMixingPuzzle): void {
+    const pigments = STUDIO_PIGMENTS
+    const currentMix = mixPigments(puzzle.selectedPigments)
+    const isJohn = this.activePerspective === 'john'
+
+    mount.innerHTML = `
+      <div class="puzzle-perspective-banner">
+        <span class="perspective-badge">OBSERVATION MODE: ${isJohn ? 'JOHN (DEUTERANOPE)' : 'JACK (TRICHROMAT)'}</span>
+        <p class="perspective-tip">${isJohn 
+          ? 'John detects shape marks (●, ▲, ■, ◆), reflectance brightness, and label codes.' 
+          : 'Jack discriminates full-spectrum pigment hues: Blue, Yellow, Red, White.'}</p>
+      </div>
+
+      <div class="mixing-preview-row">
+        <div class="preview-box">
+          <span class="preview-box-label">Target Goal</span>
+          <div class="preview-box-color" style="background: #15803d; color: #ffffff;">
+            Viridian Leaf Green
+          </div>
+          <small style="font-size: 9.5px; color: var(--text-muted);">2 Primary Pigments</small>
+        </div>
+        <div class="preview-box">
+          <span class="preview-box-label">Current Palette Mix</span>
+          <div class="preview-box-color current-mix-color" style="background: ${currentMix.hex}; color: ${currentMix.rgb[1] > 0.6 || (currentMix.rgb[0] > 0.6 && currentMix.rgb[1] > 0.6) ? '#003049' : '#ffffff'};">
+            ${currentMix.name}
+          </div>
+          <small class="mix-count-label" style="font-size: 9.5px; color: var(--text-muted);">${puzzle.selectedPigments.length} / 2 Pigments on Palette</small>
+        </div>
+      </div>
+
+      <p class="mixing-prompt">Select canisters to add physical pigments to the mixing palette:</p>
+
+      <div class="mixing-grid">
+        ${pigments.map(p => {
+          const isSelected = puzzle.selectedPigments.includes(p.id)
+          return `
+            <button type="button" class="pigment-card ${isSelected ? 'is-selected' : ''}" data-pigment="${p.id}">
+              <div class="pigment-swatch" style="background: ${p.colorHex}; color: ${p.luminance < 0.6 ? '#ffffff' : '#1e242b'};">
+                ${p.symbolChar}
+              </div>
+              <span class="pigment-name">${p.name}</span>
+              <span class="pigment-symbol">${p.symbol.toUpperCase()} (${p.symbolChar})</span>
+              <span class="pigment-lum">Value: ${(p.luminance * 100).toFixed(0)}%</span>
+            </button>
+          `
+        }).join('')}
+      </div>
+
+      <div class="palette-btn-row">
+        <button type="button" class="btn btn-small" data-action="clear-palette">Clear Palette</button>
+      </div>
+
+      <div class="puzzle-feedback" role="status" aria-live="polite" hidden></div>
+    `
+  }
+
+  private renderValuePuzzle(mount: HTMLElement, puzzle: ValuePuzzle): void {
+    const isJohn = this.activePerspective === 'john'
+    const selected = puzzle.samples.find(s => s.id === puzzle.selectedSampleId)
+
+    mount.innerHTML = `
+      <div class="puzzle-perspective-banner">
+        <span class="perspective-badge">OBSERVATION MODE: ${isJohn ? 'JOHN (DEUTERANOPE)' : 'JACK (TRICHROMAT)'}</span>
+        <p class="perspective-tip">${isJohn
+          ? 'John reads value contrast (luminance brightness). Tint, Tone, and Shade remain 100% distinguishable!'
+          : 'Jack examines both saturation and luminance variation against the architectural study.'}</p>
+      </div>
+
+      <div class="mixing-preview-row">
+        <div class="preview-box">
+          <span class="preview-box-label">Reference Easel Study</span>
+          <div class="preview-box-color" style="background: #475569; color: #ffffff;">
+            Target: Muted Tone
+          </div>
+          <small style="font-size: 9.5px; color: var(--text-muted);">Target Luminance: 48% (Mid-Value)</small>
+        </div>
+        <div class="preview-box">
+          <span class="preview-box-label">Your Selection</span>
+          <div class="preview-box-color current-value-color" style="background: ${selected ? selected.hex : '#22252c'}; color: #ffffff;">
+            ${selected ? selected.label : 'None Selected'}
+          </div>
+          <small style="font-size: 9.5px; color: var(--text-muted);">${selected ? `Luminance: ${(selected.luminance * 100).toFixed(0)}%` : 'Select a variation below'}</small>
+        </div>
+      </div>
+
+      <!-- Luminance Ramp Comparator -->
+      <div class="luminance-ramp-wrapper">
+        <div class="luminance-ramp-header">
+          <span>Luminance / Value Scale (John's Perception)</span>
+          <span class="lum-match-badge">${selected ? (selected.type === 'tone' ? '✓ MATCH' : 'MISMATCH') : 'NO SELECTION'}</span>
+        </div>
+        <div class="luminance-ramp-bar">
+          <div class="lum-marker lum-target" style="left: 48%;" title="Target: 48%">Target (48%)</div>
+          ${selected ? `<div class="lum-marker lum-current" style="left: ${(selected.luminance * 100).toFixed(0)}%;">${selected.label}</div>` : ''}
+        </div>
+      </div>
+
+      <p class="mixing-prompt">Select the variation matching the master reference study on the easel:</p>
+
+      <div class="value-sample-grid">
+        ${puzzle.samples.map(s => {
+          const isSelected = s.id === puzzle.selectedSampleId
+          return `
+            <button type="button" class="value-card ${isSelected ? 'is-selected' : ''}" data-sample="${s.id}">
+              <div class="value-swatch" style="background: ${s.hex};"></div>
+              <div class="value-card-info">
+                <strong>${s.label}</strong>
+                <span>${s.description}</span>
+                <small>Luminance: ${(s.luminance * 100).toFixed(0)}%</small>
+              </div>
+            </button>
+          `
+        }).join('')}
+      </div>
+
+      <div class="puzzle-feedback" role="status" aria-live="polite" hidden></div>
+    `
+  }
+
+  private renderHarmonyPuzzle(mount: HTMLElement, puzzle: HarmonyPuzzle): void {
+    const isJohn = this.activePerspective === 'john'
+    const sorted = [...puzzle.paintings].sort((a, b) => a.slot - b.slot)
+
+    mount.innerHTML = `
+      <div class="puzzle-perspective-banner">
+        <span class="perspective-badge">OBSERVATION MODE: ${isJohn ? 'JOHN (DEUTERANOPE)' : 'JACK (TRICHROMAT)'}</span>
+        <p class="perspective-tip">${isJohn
+          ? 'John detects geometric wheel angle marks and frame hatching symbols (▮, ≋, ↔, ▲).'
+          : 'Jack verifies harmonic chord relationships across the 360° colour wheel.'}</p>
+      </div>
+
+      <div class="harmony-curator-plaque">
+        <strong>Curator Plaque Sequence Rule:</strong>
+        <p>Slot 1: Monochromatic (1 hue) → Slot 2: Analogous (30° neighbours) → Slot 3: Complementary (180° polar opposites) → Slot 4: Split-Complementary (150°/210° split wings)</p>
+      </div>
+
+      <div class="harmony-slots-grid">
+        ${sorted.map((p, idx) => `
+          <div class="harmony-card" data-painting="${p.id}">
+            <div class="harmony-card-header">
+              <span class="slot-num">Slot ${idx + 1}</span>
+              <span class="harmony-icon">${p.iconChar}</span>
+            </div>
+            <div class="harmony-swatches">
+              ${p.colorsHex.map(c => `<span style="background: ${c};"></span>`).join('')}
+            </div>
+            <strong>${p.title}</strong>
+            <span class="harmony-type-label">${p.harmonyType.toUpperCase()}</span>
+            <p class="artist-note">${p.artistNote}</p>
+            <div class="harmony-nav-row">
+              <button type="button" class="btn btn-small" data-swap-dir="-1" data-slot="${p.slot}" ${idx === 0 ? 'disabled' : ''}>◀ Left</button>
+              <button type="button" class="btn btn-small" data-swap-dir="1" data-slot="${p.slot}" ${idx === 3 ? 'disabled' : ''}>Right ▶</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="puzzle-feedback" role="status" aria-live="polite" hidden></div>
+    `
+  }
+
+  private renderVaultPuzzle(mount: HTMLElement, puzzle: VaultPuzzle): void {
+    const isJohn = this.activePerspective === 'john'
+
+    mount.innerHTML = `
+      <div class="puzzle-perspective-banner">
+        <span class="perspective-badge">OBSERVATION MODE: ${isJohn ? 'JOHN (DEUTERANOPE)' : 'JACK (TRICHROMAT)'}</span>
+        <p class="perspective-tip">${isJohn
+          ? 'John observes positional order symbols: Circle (●)=Pos 1, Triangle (▲)=Pos 2, Square (■)=Pos 3, Diamond (◆)=Pos 4.'
+          : 'Jack observes chromatic numeral wavelengths painted in red-green contrast: 4, 8, 2, 9.'}</p>
+      </div>
+
+      <div class="vault-dossier-grid">
+        <div class="dossier-card">
+          <strong>Jack's Chromatic Numeral Clues</strong>
+          <p>Numeral 4 · Numeral 8 · Numeral 2 · Numeral 9</p>
+        </div>
+        <div class="dossier-card">
+          <strong>John's Sequence Position Marks</strong>
+          <p>● Circle (1st) → ▲ Triangle (2nd) → ■ Square (3rd) → ◆ Diamond (4th)</p>
+        </div>
+      </div>
+
+      <div class="vault-display">
+        ${[0, 1, 2, 3].map(i => `
+          <span class="vault-digit ${puzzle.currentCode[i] ? 'has-val' : ''}">
+            ${puzzle.currentCode[i] || '_'}
+          </span>
+        `).join('')}
+      </div>
+
+      <div class="vault-keypad">
+        ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `
+          <button type="button" class="vault-key" data-key="${n}">${n}</button>
+        `).join('')}
+        <button type="button" class="vault-key vault-key-fn" data-key="clear">CLR</button>
+        <button type="button" class="vault-key" data-key="0">0</button>
+        <button type="button" class="vault-key vault-key-fn" data-key="backspace">⌫</button>
+      </div>
+
+      <div class="puzzle-feedback" role="status" aria-live="polite" hidden></div>
+    `
+  }
+
+  private testPuzzleSolution(): void {
+    if (!this.activePuzzle) return
+
+    // If already complete, clicking submit proceeds to next installation
+    if (this.activePuzzle.isComplete) {
+      this.closePuzzle()
+      return
+    }
+
+    const result = this.activePuzzle.check()
+    const feedback = this.q<HTMLElement>('.puzzle-feedback')
+    const submitBtn = this.q<HTMLButtonElement>('[data-action="puzzle-submit"]')
+
+    if (feedback) {
+      feedback.hidden = false
+      feedback.textContent = result.message
+      feedback.className = `puzzle-feedback ${result.success ? 'is-success' : 'is-error'}`
+    }
+
+    if (result.success) {
+      this.audio.play('puzzle_success')
+      if (submitBtn) {
+        submitBtn.textContent = 'Proceed to Next Station →'
+        submitBtn.classList.add('btn-success')
+      }
+      this.onPuzzleSolved?.(this.activePuzzle.id)
+    } else {
+      this.audio.play('ui')
+    }
+  }
+
   private template(): string {
     const range = (name: string, label: string, min: number, max: number, step: number) =>
       `<label class="row"><span data-i18n="${label}"></span><input data-nav type="range" name="${name}" min="${min}" max="${max}" step="${step}"></label>`
@@ -606,6 +987,10 @@ export class Ui {
 </section>
 
 <section class="screen screen-hud" data-screen="hud">
+  <div class="hud-objective glass-panel" aria-live="polite">
+    <span class="hud-objective-badge">OBJECTIVE</span>
+    <span class="hud-objective-text">Installation 01: The Mixing Bench · Subtractive Pigment Mixing</span>
+  </div>
   <header class="studio-hud-top">
     <div class="studio-hud-left">
       <div class="studio-objective glass-panel"><span class="studio-objective-kicker" data-i18n="studio.stage"></span><strong data-i18n="studio.objective"></strong><p data-i18n="studio.objectiveCopy"></p></div>
@@ -631,6 +1016,20 @@ export class Ui {
   <div class="studio-interact glass-panel" hidden aria-live="polite"><kbd>E</kbd><span><b class="studio-interact-label"></b><small data-i18n="studio.pressToExamine"></small></span></div>
   <div class="studio-note glass-panel" role="status" aria-live="polite" hidden></div>
   <aside class="studio-controls glass-panel" aria-label="Studio controls" hidden><strong data-i18n="studio.controlsTitle"></strong><p data-i18n="studio.controlsCopy"></p></aside>
+  <div class="hud-puzzle-overlay is-hidden" id="puzzle-overlay" role="dialog" aria-modal="true">
+    <div class="puzzle-dialog-panel glass-panel">
+      <div class="puzzle-header">
+        <span class="puzzle-kicker"></span>
+        <h2 class="puzzle-title"></h2>
+        <p class="puzzle-desc"></p>
+      </div>
+      <div class="puzzle-body" id="puzzle-mount"></div>
+      <div class="puzzle-actions">
+        <button data-nav class="btn btn-quiet" data-action="puzzle-close">Back to Studio</button>
+        <button data-nav class="btn btn-primary" data-action="puzzle-submit">Test Solution</button>
+      </div>
+    </div>
+  </div>
   <div class="touch">
     <div class="touch-stick"><i></i></div>
     <div class="touch-actions"><button class="touch-btn" data-touch="hint"><span data-i18n="touch.hint"></span></button><button class="touch-btn" data-touch="interact"><span data-i18n="touch.interact"></span></button><button class="touch-btn touch-vision" data-touch="vision" data-i18n-label="touch.vision"><span data-i18n="touch.vision"></span></button></div>
@@ -718,21 +1117,6 @@ export class Ui {
       <button data-nav class="btn btn-primary" data-action="restart"><span data-i18n="results.retry"></span></button>
       <button data-nav class="btn" data-action="quit"><span data-i18n="results.title"></span></button>
     </nav>
-  </div>
-</section>
-
-<section class="screen screen-puzzle screen-modal" data-screen="puzzle">
-  <div class="puzzle-dialog-panel glass-panel">
-    <div class="puzzle-header">
-      <span class="puzzle-kicker"></span>
-      <h2 class="puzzle-title"></h2>
-      <p class="puzzle-desc"></p>
-    </div>
-    <div class="puzzle-body" id="puzzle-mount"></div>
-    <div class="puzzle-actions">
-      <button data-nav class="btn btn-quiet" data-action="puzzle-close">Back to Studio</button>
-      <button data-nav class="btn btn-primary" data-action="puzzle-submit">Test Solution</button>
-    </div>
   </div>
 </section>`
   }

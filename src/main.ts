@@ -101,6 +101,23 @@ async function boot(): Promise<void> {
     input.unlockPointer()
     ui.showCompletion(remainingTime)
   }
+  game.onOpenPuzzle = puzzle => {
+    input.unlockPointer()
+    ui.openPuzzle(puzzle, g.perspective)
+  }
+  game.onPlayerMoved = () => {
+    if (ui.isPuzzleOpen) {
+      ui.closePuzzle()
+    }
+  }
+  ui.onPuzzleSolved = puzzleId => {
+    game?.onPuzzleSolved(puzzleId)
+  }
+  ui.onPuzzleClosed = () => {
+    if (game?.mode === 'puzzle') {
+      game.resume()
+    }
+  }
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([
       import('../scripts/manus-tuning/adapter.js'), import('./game/tuning'),
@@ -120,14 +137,14 @@ async function boot(): Promise<void> {
       ui.frame(frameSeconds)
       loop.paused = g.mode === 'paused'
       g.render(alpha, frameSeconds)
-      if (g.mode === 'playing') ui.updateStudioHud(g.focusedTarget, g.note, g.helpVisible, g.perspective, g.timer.formatted)
+      if (g.mode === 'playing') ui.updateStudioHud(g.focusedTarget, g.note, g.helpVisible, g.perspective, g.timer.formatted, g.currentObjective)
     },
   })
   loop.start()
 
   document.addEventListener('pointerlockchange', () => {
     // Browsers release pointer lock on Escape without delivering the key: treat that as pause.
-    if (!document.pointerLockElement && g.mode === 'playing' && input.method === 'keyboard') {
+    if (!document.pointerLockElement && g.mode === 'playing' && !ui.isPuzzleOpen && input.method === 'keyboard') {
       lockLostAt = performance.now()
       pause()
     }
@@ -137,7 +154,7 @@ async function boot(): Promise<void> {
   })
   window.addEventListener('game:pause', pause)
   canvas.addEventListener('click', () => {
-    if (g.mode === 'playing') input.lockPointer()
+    if (g.mode === 'playing' && !ui.isPuzzleOpen) input.lockPointer()
   })
   new TouchControls(document.getElementById('ui')!, input, () => g.mode === 'playing')
 

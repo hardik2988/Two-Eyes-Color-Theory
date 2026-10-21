@@ -460,29 +460,58 @@ kbd { display: inline-grid; min-width: 26px; height: 26px; place-items: center; 
 .studio-controls p { margin: 6px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.75; }
 
 /* Interactive Puzzle Workspace Dialog */
+.hud-puzzle-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 48, 73, 0.38);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  z-index: 10;
+}
+.hud-puzzle-overlay.is-hidden {
+  display: none !important;
+}
 .puzzle-dialog-panel {
-  width: min(100%, 640px);
-  padding: clamp(24px, 4vw, 36px);
+  width: min(100%, 680px);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: clamp(20px, 3.5vw, 32px);
   border: 1px solid var(--panel-border-strong);
   border-radius: 8px;
   background: var(--base-elevated);
   box-shadow: 0 28px 80px rgba(0, 48, 73, 0.22);
 }
-.puzzle-header { margin-bottom: 20px; border-bottom: 1px solid var(--panel-border); padding-bottom: 14px; }
+.puzzle-header { margin-bottom: 16px; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; }
 .puzzle-kicker { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: var(--molten-lava); text-transform: uppercase; }
-.puzzle-title { margin: 6px 0 4px; font-family: var(--display-font); font-size: 26px; color: var(--deep-space-blue); font-weight: 500; }
-.puzzle-desc { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-muted); }
-.puzzle-body { margin-top: 18px; }
-.puzzle-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+.puzzle-title { margin: 6px 0 4px; font-family: var(--display-font); font-size: 24px; color: var(--deep-space-blue); font-weight: 500; }
+.puzzle-desc { margin: 0; font-size: 11.5px; line-height: 1.65; color: var(--text-muted); }
+.puzzle-body { margin-top: 14px; }
+.puzzle-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+
+/* Perspective Context Banner in Dialogs */
+.puzzle-perspective-banner {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--steel-blue);
+  border-radius: 0 4px 4px 0;
+  background: rgba(102, 155, 188, 0.12);
+}
+.perspective-badge { font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--deep-space-blue); text-transform: uppercase; display: block; margin-bottom: 2px; }
+.perspective-tip { margin: 0; font-size: 10.5px; line-height: 1.5; color: var(--deep-space-blue); }
+
+.mixing-prompt { font-size: 11px; font-weight: 600; color: var(--deep-space-blue); margin: 14px 0 8px; }
 
 /* Paint Mixing Station Styles */
-.mixing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.mixing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
 .pigment-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 14px 10px;
+  gap: 6px;
+  padding: 12px 8px;
   border: 1.5px solid var(--panel-border);
   border-radius: 6px;
   background: var(--papaya-whip);
@@ -491,54 +520,215 @@ kbd { display: inline-grid; min-width: 26px; height: 26px; place-items: center; 
 }
 .pigment-card:hover { transform: translateY(-2px); border-color: var(--deep-space-blue); }
 .pigment-card.is-selected { border-color: var(--brick-red); background: #fdf5e6; box-shadow: 0 0 0 2px var(--brick-red); }
-.pigment-swatch { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.15); display: grid; place-items: center; color: #fff; font-size: 16px; font-weight: 700; }
-.pigment-name { font-size: 10px; font-weight: 600; text-align: center; color: var(--deep-space-blue); }
-.pigment-symbol { font-size: 9px; color: var(--molten-lava); font-weight: 700; }
+.pigment-swatch { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.15); display: grid; place-items: center; color: #fff; font-size: 15px; font-weight: 700; }
+.pigment-name { font-size: 9.5px; font-weight: 600; text-align: center; color: var(--deep-space-blue); line-height: 1.3; }
+.pigment-symbol { font-size: 8.5px; color: var(--molten-lava); font-weight: 700; }
+.pigment-lum { font-size: 8px; color: var(--text-dim); }
+
 .mixing-preview-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  padding: 16px;
+  gap: 14px;
+  padding: 14px;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   background: var(--papaya-whip);
 }
-.preview-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.preview-box-label { font-size: 9px; font-weight: 700; letter-spacing: .12em; color: var(--text-dim); text-transform: uppercase; }
-.preview-box-color { width: 100%; height: 50px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.preview-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.preview-box-label { font-size: 8.5px; font-weight: 700; letter-spacing: .12em; color: var(--text-dim); text-transform: uppercase; }
+.preview-box-color { width: 100%; height: 46px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.palette-btn-row { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
-/* Vault Keypad Styles */
-.vault-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 240px; margin: 16px auto; }
-.vault-key {
-  min-height: 44px;
-  border: 1px solid var(--panel-border-strong);
+/* Value Workstation Styles */
+.value-sample-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.value-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--panel-border);
   border-radius: 6px;
   background: var(--papaya-whip);
-  color: var(--deep-space-blue);
-  font-size: 18px;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
-  transition: background 140ms ease;
+  transition: transform 140ms ease, border-color 140ms ease;
 }
-.vault-key:hover { background: #ffffff; }
+.value-card:hover { transform: translateY(-2px); border-color: var(--deep-space-blue); }
+.value-card.is-selected { border-color: var(--brick-red); background: #fdf5e6; box-shadow: 0 0 0 2px var(--brick-red); }
+.value-swatch { width: 38px; height: 38px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
+.value-card-info strong { display: block; font-size: 11px; color: var(--deep-space-blue); margin-bottom: 2px; }
+.value-card-info span { display: block; font-size: 9.5px; line-height: 1.4; color: var(--text-muted); }
+.value-card-info small { display: block; font-size: 8.5px; font-weight: 700; color: var(--molten-lava); margin-top: 3px; }
+
+/* Value / Luminance Ramp Comparator */
+.luminance-ramp-wrapper {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--papaya-whip);
+}
+.luminance-ramp-header { display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--deep-space-blue); margin-bottom: 8px; }
+.lum-match-badge { color: var(--molten-lava); }
+.luminance-ramp-bar {
+  position: relative;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.15);
+  background: linear-gradient(to right, #000000 0%, #777777 50%, #ffffff 100%);
+}
+.lum-marker {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.lum-target { background: var(--deep-space-blue); color: #fff; z-index: 2; }
+.lum-current { background: var(--brick-red); color: #fff; top: 18px; z-index: 3; }
+
+/* Harmony Gallery Wall Styles */
+.harmony-curator-plaque {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--molten-lava);
+  border-radius: 0 4px 4px 0;
+  background: rgba(120, 0, 0, 0.08);
+}
+.harmony-curator-plaque strong { display: block; font-size: 9.5px; color: var(--molten-lava); text-transform: uppercase; margin-bottom: 2px; }
+.harmony-curator-plaque p { margin: 0; font-size: 10.5px; line-height: 1.5; color: var(--deep-space-blue); }
+
+.harmony-slots-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.harmony-card {
+  padding: 10px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--papaya-whip);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.harmony-card-header { display: flex; justify-content: space-between; align-items: center; }
+.slot-num { font-size: 9px; font-weight: 700; color: var(--molten-lava); text-transform: uppercase; }
+.harmony-icon { font-size: 13px; font-weight: 700; color: var(--deep-space-blue); }
+.harmony-swatches { display: flex; height: 18px; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
+.harmony-swatches span { flex: 1; height: 100%; }
+.harmony-card strong { font-size: 10px; color: var(--deep-space-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.harmony-type-label { font-size: 8px; font-weight: 700; color: var(--steel-blue); text-transform: uppercase; }
+.artist-note { font-size: 8.5px; line-height: 1.4; color: var(--text-muted); margin: 0; min-height: 36px; }
+.harmony-nav-row { display: flex; justify-content: space-between; gap: 4px; margin-top: auto; }
+.harmony-nav-row button { flex: 1; padding: 4px; font-size: 8.5px; }
+
+/* Vault Clue Dossier & Keypad Styles */
+.vault-dossier-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.dossier-card {
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--papaya-whip);
+}
+.dossier-card strong { display: block; font-size: 9.5px; color: var(--molten-lava); margin-bottom: 4px; }
+.dossier-card p { margin: 0; font-size: 10px; line-height: 1.5; color: var(--deep-space-blue); }
+
 .vault-display {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   height: 52px;
   margin-bottom: 14px;
   border: 1.5px solid var(--panel-border-strong);
   border-radius: 6px;
   background: var(--deep-space-blue);
   color: var(--papaya-whip);
+}
+.vault-digit {
+  width: 32px;
+  height: 40px;
+  display: grid;
+  place-items: center;
   font-family: monospace;
   font-size: 26px;
-  letter-spacing: .3em;
+  font-weight: 700;
+  border-bottom: 2px solid var(--steel-blue);
+}
+.vault-digit.has-val { border-bottom-color: var(--brick-red); color: #fff; }
+
+.vault-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 220px; margin: 12px auto; }
+.vault-key {
+  min-height: 40px;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 6px;
+  background: var(--papaya-whip);
+  color: var(--deep-space-blue);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.vault-key:hover { background: #ffffff; }
+.vault-key-fn { font-size: 11px; background: rgba(0, 48, 73, 0.08); }
+
+/* Puzzle Feedback Alert Box */
+.puzzle-feedback {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+.puzzle-feedback.is-success {
+  background: rgba(21, 128, 61, 0.12);
+  border: 1px solid #15803d;
+  color: #15803d;
+  font-weight: 600;
+}
+.puzzle-feedback.is-error {
+  background: rgba(193, 18, 31, 0.12);
+  border: 1px solid var(--brick-red);
+  color: var(--molten-lava);
+}
+.btn-success { background: #15803d !important; color: #fff !important; }
+
+/* Objective HUD Card */
+.hud-objective {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  border: 1px solid var(--panel-border-strong);
+  background: rgba(253, 240, 213, 0.96);
+  box-shadow: 0 6px 20px rgba(0, 48, 73, 0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+.hud-objective-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: #fff;
+  background: var(--molten-lava);
+  padding: 2px 6px;
+  border-radius: 9999px;
+}
+.hud-objective-text {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--deep-space-blue);
+  white-space: nowrap;
 }
 
 /* Touch Controls */
-.touch { position: absolute; right: 20px; bottom: calc(24px + var(--safe-b)); left: 20px; display: none; align-items: end; justify-content: space-between; pointer-events: none; }
+.touch { position: absolute; right: 20px; bottom: calc(24px + var(--safe-b)); left: 20px; display: none; align-items: end; justify-content: space-between; pointer-events: none; z-index: 20; }
 .touch-stick { width: 116px; height: 116px; border: 2px solid rgba(0, 48, 73, 0.3); border-radius: 50%; background: rgba(253, 240, 213, 0.4); }
 .touch-stick i { display: block; width: 42px; height: 42px; margin: 35px; border: 2px solid var(--brick-red); border-radius: 50%; background: rgba(193, 18, 31, 0.2); }
 .touch-btn { width: 68px; height: 68px; margin-left: 8px; border: 1px solid var(--panel-border-strong); border-radius: 50%; background: var(--base-elevated); color: var(--deep-space-blue); font-size: 10px; font-weight: 700; pointer-events: auto; }
@@ -582,8 +772,16 @@ kbd { display: inline-grid; min-width: 26px; height: 26px; place-items: center; 
   .studio-card { max-width: 100%; padding: 16px 18px; }
   .lesson-grid { grid-template-columns: 1fr; }
   .touch { display: flex; }
+  .hud-puzzle-overlay .puzzle-dialog-panel { margin-bottom: 96px; max-height: calc(100vh - 140px); }
   .mixing-grid { grid-template-columns: repeat(2, 1fr); }
   .completion-recap { grid-template-columns: 1fr; }
+}
+
+#ui[data-active-screen="pause"] .touch,
+#ui[data-active-screen="settings"] .touch,
+#ui[data-active-screen="leaderboard"] .touch,
+#ui[data-active-screen="results"] .touch {
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

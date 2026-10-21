@@ -23,6 +23,9 @@ export class StudioWorld {
   readonly scene = new THREE.Scene()
   readonly spawn = v3(0, 0.72, 5.8)
   readonly targets: StudioTarget[] = []
+  readonly objectiveBeacon: THREE.Group
+  private beaconTargetPos = new THREE.Vector3(0, 2.2, 3.05)
+  private mixingCanvasMat?: THREE.MeshStandardMaterial
   private keyLight?: THREE.DirectionalLight
   private readonly dust: THREE.Points
   private readonly dustPosition: THREE.BufferAttribute
@@ -75,9 +78,67 @@ export class StudioWorld {
     this.buildFurniture()
     this.dust = this.createDaylightMotes()
     this.dustPosition = this.dust.geometry.getAttribute('position') as THREE.BufferAttribute
+
+    // 3D Objective Waypoint Beacon (hovers and guides player to active installation)
+    this.objectiveBeacon = new THREE.Group()
+    const beaconRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.32, 0.032, 16, 32),
+      new THREE.MeshStandardMaterial({ color: 0xc1121f, emissive: 0x780000, roughness: 0.3, metalness: 0.5 }),
+    )
+    beaconRing.rotation.x = Math.PI / 2
+    this.objectiveBeacon.add(beaconRing)
+
+    const beaconMarker = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.16),
+      new THREE.MeshStandardMaterial({ color: 0xfdf0d5, emissive: 0xc1121f, roughness: 0.2 }),
+    )
+    beaconMarker.position.y = 0.22
+    this.objectiveBeacon.add(beaconMarker)
+
+    this.objectiveBeacon.position.copy(this.beaconTargetPos)
+    this.scene.add(this.objectiveBeacon)
+
+    // Ensure all target child meshes are flagged for raycasting
+    for (const target of this.targets) {
+      target.object.traverse(child => {
+        child.userData.interaction = target
+      })
+    }
+  }
+
+  setObjectiveStation(stationId: string): void {
+    if (stationId === 'paint-mixing') {
+      this.beaconTargetPos.set(0, 2.2, 3.05)
+      this.objectiveBeacon.visible = true
+    } else if (stationId === 'value') {
+      this.beaconTargetPos.set(-3.25, 2.8, 0.55)
+      this.objectiveBeacon.visible = true
+    } else if (stationId === 'harmonies') {
+      this.beaconTargetPos.set(0, 3.8, 7.15)
+      this.objectiveBeacon.visible = true
+    } else if (stationId === 'vault') {
+      this.beaconTargetPos.set(0, 3.2, -7.0)
+      this.objectiveBeacon.visible = true
+    } else {
+      this.objectiveBeacon.visible = false
+    }
+  }
+
+  setPaletteMixedColor(hex: string): void {
+    if (this.mixingCanvasMat) {
+      this.mixingCanvasMat.color.set(hex)
+    }
   }
 
   update(time: number, delta: number): void {
+    // 3D Waypoint beacon bob and spin
+    if (this.objectiveBeacon.visible) {
+      this.objectiveBeacon.rotation.y += delta * 1.6
+      this.objectiveBeacon.position.x = this.beaconTargetPos.x
+      this.objectiveBeacon.position.z = this.beaconTargetPos.z
+      this.objectiveBeacon.position.y = this.beaconTargetPos.y + Math.sin(time * 2.8) * 0.08
+    }
+
     const positions = this.dustPosition.array as Float32Array
     for (let i = 0; i < positions.length; i += 3) {
       positions[i + 1] += Math.sin(time * 0.45 + i) * delta * 0.015
@@ -224,7 +285,11 @@ export class StudioWorld {
     this.scene.add(palette)
     this.mesh(palette, new THREE.BoxGeometry(0.85, 0.04, 0.5), this.mats.canvas, [0, 0, 0])
 
-    // Target swatch display on easel ledge
+    // Live subtractive mixing swatch on palette
+    this.mixingCanvasMat = new THREE.MeshStandardMaterial({ color: 0xd4cebe, roughness: 0.6 })
+    this.mesh(palette, new THREE.BoxGeometry(0.38, 0.045, 0.28), this.mixingCanvasMat, [-0.16, 0.02, 0])
+
+    // Target swatch display on bench
     this.mesh(palette, new THREE.BoxGeometry(0.24, 0.03, 0.16), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 }), [0.28, 0.03, 0])
 
     // Brush jar with assorted artist brushes
