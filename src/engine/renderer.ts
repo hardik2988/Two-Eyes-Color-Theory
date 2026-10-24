@@ -9,19 +9,26 @@ import { DEUTERANOPIA_SHADER } from './color-vision'
 import { LENS_SHADER } from './lens-shader'
 import type { Quality } from './save'
 
-type Preset = { pixelRatio: number; shadows: boolean; shadowMap: number; bloom: boolean; antialias: boolean }
+type Preset = {
+  pixelRatio: number
+  shadows: boolean
+  shadowMap: number
+  bloom: boolean
+  gtao: boolean
+  antialias: boolean
+}
 export const QUALITY_PRESETS: Record<Quality, Preset> = {
-  low: { pixelRatio: 1, shadows: false, shadowMap: 512, bloom: false, antialias: false },
-  medium: { pixelRatio: 1.5, shadows: true, shadowMap: 1024, bloom: false, antialias: true },
-  high: { pixelRatio: 2.0, shadows: true, shadowMap: 2048, bloom: true, antialias: true },
-  ultra: { pixelRatio: 2.0, shadows: true, shadowMap: 4096, bloom: true, antialias: true },
+  low: { pixelRatio: 1.0, shadows: false, shadowMap: 512, bloom: false, gtao: false, antialias: false },
+  medium: { pixelRatio: 1.0, shadows: true, shadowMap: 1024, bloom: false, gtao: false, antialias: true },
+  high: { pixelRatio: 1.25, shadows: true, shadowMap: 1024, bloom: true, gtao: true, antialias: true },
+  ultra: { pixelRatio: 1.5, shadows: true, shadowMap: 2048, bloom: true, gtao: true, antialias: true },
 }
 
-/** Pick a starting quality from device hints; the player can override it in Settings. */
+/** Pick a starting quality from device hints; defaults to medium on standard laptops for rock-solid 60 fps. */
 export function suggestQuality(): Quality {
   const coarse = matchMedia('(pointer: coarse)').matches
   const cores = navigator.hardwareConcurrency ?? 4
-  if (coarse || cores <= 4) return 'medium'
+  if (coarse || cores <= 6) return 'medium'
   return 'high'
 }
 
@@ -114,11 +121,15 @@ export class Renderer {
     // 1. Base 3D Scene Render Pass
     this.composer.addPass(new RenderPass(scene, camera))
 
-    // 2. High-Quality Ground Truth Ambient Occlusion (Contact shadows under props, benches, boxes)
-    if (this.preset.shadows) {
-      const gtao = new GTAOPass(scene, camera, size.x, size.y)
+    // 2. High-Performance Ground Truth Ambient Occlusion (Half-res, only on High/Ultra presets)
+    if (this.preset.gtao) {
+      const gtaoW = Math.max(320, Math.floor(size.x * 0.5))
+      const gtaoH = Math.max(240, Math.floor(size.y * 0.5))
+      const gtao = new GTAOPass(scene, camera, gtaoW, gtaoH)
       gtao.output = GTAOPass.OUTPUT.Default
-      gtao.blendIntensity = 0.85
+      gtao.blendIntensity = 0.72
+      gtao.pdSamples = 8
+      gtao.pdRings = 2
       gtao.updateGtaoMaterial({
         radius: 0.35,
         distanceFallOff: 1.0,
@@ -127,9 +138,10 @@ export class Renderer {
       this.composer.addPass(gtao)
     }
 
-    // 3. Optical Bloom (High threshold, subtle highlight glow on sunbeams & lighting)
+    // 3. Optical Bloom (Half-res for efficiency, subtle highlight glow)
     if (this.preset.bloom) {
-      this.bloom = new UnrealBloomPass(size, 0.16, 0.18, 0.95)
+      const bloomSize = new THREE.Vector2(Math.floor(size.x * 0.5), Math.floor(size.y * 0.5))
+      this.bloom = new UnrealBloomPass(bloomSize, 0.16, 0.18, 0.95)
       this.composer.addPass(this.bloom)
     }
 
@@ -173,11 +185,17 @@ export class Renderer {
       this.frameCount = 0
       this.lastFpsCheck = now
 
-      if (fps < 48 && this.gl.shadowMap.enabled) {
+      if (fps < 50 && this.preset.gtao) {
         this.lowFpsCounter++
-        if (this.lowFpsCounter >= 3) {
+        if (this.lowFpsCounter >= 2) {
           this.lowFpsCounter = 0
           this.onAutoReduce?.('medium')
+        }
+      } else if (fps < 38 && this.gl.shadowMap.enabled) {
+        this.lowFpsCounter++
+        if (this.lowFpsCounter >= 2) {
+          this.lowFpsCounter = 0
+          this.onAutoReduce?.('low')
         }
       } else {
         this.lowFpsCounter = Math.max(0, this.lowFpsCounter - 1)

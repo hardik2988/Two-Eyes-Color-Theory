@@ -351,31 +351,31 @@ export class StudioWorld {
   }
 
   private buildRoom(): void {
-    // 1. Natural French White Oak Plank Flooring (PBR MeshPhysicalMaterial with Clearcoat & Normal Map)
-    this.box('Studio floor', v3(18, 0.36, 15), v3(0, -0.18, 0), this.floorMaterial(), true)
+    // 1. Natural French White Oak Plank Flooring (Receives shadows, does not cast)
+    this.box('Studio floor', v3(18, 0.36, 15), v3(0, -0.18, 0), this.floorMaterial(), true, false)
 
     // 2. Ivory Architectural Ceiling with Recessed Light Channels
-    this.box('Ceiling', v3(18, 0.28, 15), v3(0, 5.58, 0), this.mats.wallDark, false)
+    this.box('Ceiling', v3(18, 0.28, 15), v3(0, 5.58, 0), this.mats.wallDark, false, false)
 
     // 3. Perimeter Walls with Venetian Plaster Finish
-    this.box('North wall (Vault Feature Wall)', v3(18, 5.6, 0.38), v3(0, 2.8, -7.5), this.mats.travertine, true)
-    this.box('South wall (Curator Gallery)', v3(18, 5.6, 0.38), v3(0, 2.8, 7.5), this.mats.wall, true)
-    this.box('West wall (Window Wall)', v3(0.38, 5.6, 15), v3(-9, 2.8, 0), this.mats.wall, true)
-    this.box('East wall (Window Wall)', v3(0.38, 5.6, 15), v3(9, 2.8, 0), this.mats.wall, true)
+    this.box('North wall (Vault Feature Wall)', v3(18, 5.6, 0.38), v3(0, 2.8, -7.5), this.mats.travertine, true, false)
+    this.box('South wall (Curator Gallery)', v3(18, 5.6, 0.38), v3(0, 2.8, 7.5), this.mats.wall, true, false)
+    this.box('West wall (Window Wall)', v3(0.38, 5.6, 15), v3(-9, 2.8, 0), this.mats.wall, true, false)
+    this.box('East wall (Window Wall)', v3(0.38, 5.6, 15), v3(9, 2.8, 0), this.mats.wall, true, false)
 
     // Solid Wood Ceiling Trusses
     for (const z of [-4.5, -1.5, 1.5, 4.5]) {
-      this.box('Ceiling timber beam', v3(17.6, 0.22, 0.2), v3(0, 5.38, z), this.mats.darkWood, false)
+      this.box('Ceiling timber beam', v3(17.6, 0.22, 0.2), v3(0, 5.38, z), this.mats.darkWood, false, false)
     }
 
     // Architectural Trim & Baseboards
     for (const x of [-8.77, 8.77]) {
-      this.box('Baseboard', v3(0.06, 0.22, 14.2), v3(x, 0.11, 0), this.mats.trim, false)
-      this.box('Crown cornice', v3(0.12, 0.14, 14.2), v3(x, 5.48, 0), this.mats.trim, false)
+      this.box('Baseboard', v3(0.06, 0.22, 14.2), v3(x, 0.11, 0), this.mats.trim, false, false)
+      this.box('Crown cornice', v3(0.12, 0.14, 14.2), v3(x, 5.48, 0), this.mats.trim, false, false)
     }
     for (const z of [-7.27, 7.27]) {
-      this.box('Baseboard', v3(17.2, 0.22, 0.06), v3(0, 0.11, z), this.mats.trim, false)
-      this.box('Crown cornice', v3(17.2, 0.14, 0.12), v3(0, 5.48, z), this.mats.trim, false)
+      this.box('Baseboard', v3(17.2, 0.22, 0.06), v3(0, 0.11, z), this.mats.trim, false, false)
+      this.box('Crown cornice', v3(17.2, 0.14, 0.12), v3(0, 5.48, z), this.mats.trim, false, false)
     }
 
     // Floor-to-ceiling Architectural Windows with Daylight Glass & Exterior Panoramic Views
@@ -396,18 +396,18 @@ export class StudioWorld {
 
     for (const z of [-4.35, 0, 4.35]) {
       // West window apertures with transparent architectural glass
-      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(-8.79, 2.7, z), this.mats.windowGlass, false)
-      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z - 1.5), this.mats.blackSteel, false)
-      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z + 1.5), this.mats.blackSteel, false)
-      this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(-8.73, 2.7, z), this.mats.blackSteel, false)
-      this.box('Window sill', v3(0.24, 0.08, 3.2), v3(-8.7, 0.78, z), this.mats.wood, false)
+      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(-8.79, 2.7, z), this.mats.windowGlass, false, false)
+      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z - 1.5), this.mats.blackSteel, false, false)
+      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z + 1.5), this.mats.blackSteel, false, false)
+      this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(-8.73, 2.7, z), this.mats.blackSteel, false, false)
+      this.box('Window sill', v3(0.24, 0.08, 3.2), v3(-8.7, 0.78, z), this.mats.wood, false, false)
 
       // East window apertures with transparent architectural glass
-      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(8.79, 2.7, z), this.mats.windowGlass, false)
-      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z - 1.5), this.mats.blackSteel, false)
-      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z + 1.5), this.mats.blackSteel, false)
-      this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(8.73, 2.7, z), this.mats.blackSteel, false)
-      this.box('Window sill', v3(0.24, 0.08, 3.2), v3(8.7, 0.78, z), this.mats.wood, false)
+      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(8.79, 2.7, z), this.mats.windowGlass, false, false)
+      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z - 1.5), this.mats.blackSteel, false, false)
+      this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z + 1.5), this.mats.blackSteel, false, false)
+      this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(8.73, 2.7, z), this.mats.blackSteel, false, false)
+      this.box('Window sill', v3(0.24, 0.08, 3.2), v3(8.7, 0.78, z), this.mats.wood, false, false)
     }
 
     // Realistic architectural daylight sunbeam shafts streaming from West windows
@@ -1884,17 +1884,17 @@ export class StudioWorld {
     })
   }
 
-  private box(name: string, size: THREE.Vector3, center: THREE.Vector3, material: THREE.Material, collide: boolean): THREE.Mesh {
-    const mesh = this.mesh(this.scene, new THREE.BoxGeometry(size.x, size.y, size.z), material, [center.x, center.y, center.z])
+  private box(name: string, size: THREE.Vector3, center: THREE.Vector3, material: THREE.Material, collide: boolean, castShadow = true): THREE.Mesh {
+    const mesh = this.mesh(this.scene, new THREE.BoxGeometry(size.x, size.y, size.z), material, [center.x, center.y, center.z], castShadow)
     mesh.name = name
     if (collide) this.physics.addStaticBox(center, size)
     return mesh
   }
 
-  private mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position: [number, number, number]): THREE.Mesh {
+  private mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position: [number, number, number], castShadow = true): THREE.Mesh {
     const mesh = new THREE.Mesh(geometry, material)
     mesh.position.set(position[0], position[1], position[2])
-    mesh.castShadow = true
+    mesh.castShadow = castShadow
     mesh.receiveShadow = true
     parent.add(mesh)
     return mesh

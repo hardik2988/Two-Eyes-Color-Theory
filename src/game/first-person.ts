@@ -74,9 +74,18 @@ export class FirstPersonController {
     this.syncCamera()
   }
 
+  private smoothLookX = 0
+  private smoothLookY = 0
+
   look(delta: { x: number; y: number }): void {
-    this.yaw = THREE.MathUtils.euclideanModulo(this.yaw - delta.x + Math.PI, Math.PI * 2) - Math.PI
-    this.pitch = THREE.MathUtils.clamp(this.pitch - delta.y, -1.42, 1.35)
+    if (delta.x === 0 && delta.y === 0) return
+    this.smoothLookX = THREE.MathUtils.damp(this.smoothLookX, delta.x, 36, 1 / 60)
+    this.smoothLookY = THREE.MathUtils.damp(this.smoothLookY, delta.y, 36, 1 / 60)
+    const effectiveDeltaX = this.reducedMotion ? delta.x : (delta.x * 0.7 + this.smoothLookX * 0.3)
+    const effectiveDeltaY = this.reducedMotion ? delta.y : (delta.y * 0.7 + this.smoothLookY * 0.3)
+
+    this.yaw = THREE.MathUtils.euclideanModulo(this.yaw - effectiveDeltaX + Math.PI, Math.PI * 2) - Math.PI
+    this.pitch = THREE.MathUtils.clamp(this.pitch - effectiveDeltaY, -1.42, 1.35)
     this.syncCamera()
   }
 

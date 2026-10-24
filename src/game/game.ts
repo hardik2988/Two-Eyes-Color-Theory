@@ -41,9 +41,9 @@ export class Game {
   onOpenPuzzle?: (puzzle: IPuzzle) => void
   onPlayerMoved?: () => void
 
-  private readonly physics: Physics
-  private readonly world: StudioWorld
-  private readonly player: FirstPersonController
+  readonly physics: Physics
+  readonly world: StudioWorld
+  readonly player: FirstPersonController
   private readonly raycaster = new THREE.Raycaster()
   private readonly center = new THREE.Vector2(0, 0)
   private time = 0
@@ -313,12 +313,19 @@ export class Game {
     this.renderer.render(this.world.scene, this.player.camera)
   }
 
+  private cachedRoots: THREE.Object3D[] = []
+
+  private getTargetRoots(): THREE.Object3D[] {
+    if (this.cachedRoots.length !== this.world.targets.length) {
+      this.cachedRoots = this.world.targets.map(t => t.object)
+    }
+    return this.cachedRoots
+  }
+
   private findTarget(): StudioTarget | null {
-    this.world.scene.updateMatrixWorld(true)
-    this.player.camera.updateMatrixWorld(true)
+    this.player.camera.updateMatrixWorld()
     this.raycaster.setFromCamera(this.center, this.player.camera)
-    const roots = this.world.targets.map(target => target.object)
-    const hits = this.raycaster.intersectObjects(roots, true)
+    const hits = this.raycaster.intersectObjects(this.getTargetRoots(), true)
     for (const hit of hits) {
       if (hit.distance > 8.5) break
       let current: THREE.Object3D | null = hit.object

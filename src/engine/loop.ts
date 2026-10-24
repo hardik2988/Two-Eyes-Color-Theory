@@ -41,9 +41,14 @@ export class GameLoop {
       try {
         if (!this.paused) {
           this.accumulator += frameSeconds
-          while (this.accumulator >= this.stepSeconds) {
+          let maxSubSteps = 3
+          while (this.accumulator >= this.stepSeconds && maxSubSteps > 0) {
             this.callbacks.step(this.stepSeconds)
             this.accumulator -= this.stepSeconds
+            maxSubSteps--
+          }
+          if (this.accumulator > this.stepSeconds) {
+            this.accumulator = 0
           }
         }
         this.callbacks.render(this.paused ? 1 : this.accumulator / this.stepSeconds, frameSeconds)

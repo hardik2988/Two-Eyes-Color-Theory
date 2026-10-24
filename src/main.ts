@@ -116,6 +116,11 @@ async function boot(): Promise<void> {
   game = new Game(renderer, input, audio)
   game.reducedMotion = save.data.reducedMotion
   game.timer.setUntimed(save.data.untimedMode)
+
+  // Warm-up and pre-compile shader programs to eliminate first-frame hitches
+  try {
+    renderer.gl.compile(game.world.scene, game.player.camera)
+  } catch {}
   game.onComplete = remainingTime => {
     input.setGameActive(false)
     input.unlockPointer()
