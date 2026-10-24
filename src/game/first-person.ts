@@ -45,6 +45,10 @@ export class FirstPersonController {
   private sideOffset = CAMERA_VIEW_OFFSETS.jack.side
   private targetEyeOffset = CAMERA_VIEW_OFFSETS.jack.eye
   private targetSideOffset = CAMERA_VIEW_OFFSETS.jack.side
+  private walkTime = 0
+  private bobY = 0
+  private swayX = 0
+  private rollZ = 0
 
   constructor(private readonly physics: Physics, spawn: THREE.Vector3, aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, aspect, 0.06, 45)
@@ -94,6 +98,23 @@ export class FirstPersonController {
     this.body.setNextKinematicTranslation(next)
     this.position.set(next.x, next.y, next.z)
     this.physics.step(dt)
+
+    // Ultra-smooth architectural head bob & natural gait sway
+    const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z)
+    if (grounded && horizontalSpeed > 0.25) {
+      this.walkTime += dt * (input.sprint ? 12.5 : 8.5)
+      const targetBob = Math.sin(this.walkTime) * 0.015
+      const targetSway = Math.cos(this.walkTime * 0.5) * 0.009
+      const targetRoll = Math.sin(this.walkTime * 0.5) * 0.0025
+      this.bobY += (targetBob - this.bobY) * (1 - Math.exp(-12 * dt))
+      this.swayX += (targetSway - this.swayX) * (1 - Math.exp(-12 * dt))
+      this.rollZ += (targetRoll - this.rollZ) * (1 - Math.exp(-12 * dt))
+    } else {
+      this.bobY += (0 - this.bobY) * (1 - Math.exp(-10 * dt))
+      this.swayX += (0 - this.swayX) * (1 - Math.exp(-10 * dt))
+      this.rollZ += (0 - this.rollZ) * (1 - Math.exp(-10 * dt))
+    }
+
     this.advancePerspective(dt)
     this.syncCamera()
   }
@@ -103,6 +124,10 @@ export class FirstPersonController {
     this.body.setNextKinematicTranslation({ x: spawn.x, y: spawn.y, z: spawn.z })
     this.position.copy(spawn)
     this.velocity.set(0, 0, 0)
+    this.walkTime = 0
+    this.bobY = 0
+    this.swayX = 0
+    this.rollZ = 0
     this.yaw = 0.14
     this.pitch = -0.14
     this.setPerspective('jack', true)
@@ -132,11 +157,11 @@ export class FirstPersonController {
     const at = this.body.translation()
     this.position.set(at.x, at.y, at.z)
     this.camera.position.set(
-      at.x + Math.cos(this.yaw) * this.sideOffset,
-      at.y + this.eyeHeight + this.eyeOffset,
-      at.z - Math.sin(this.yaw) * this.sideOffset,
+      at.x + Math.cos(this.yaw) * (this.sideOffset + this.swayX),
+      at.y + this.eyeHeight + this.eyeOffset + this.bobY,
+      at.z - Math.sin(this.yaw) * (this.sideOffset + this.swayX),
     )
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ')
+    this.camera.rotation.set(this.pitch, this.yaw, this.rollZ, 'YXZ')
     if (this.camera.fov !== CONFIG.camera.fov) {
       this.camera.fov = CONFIG.camera.fov
       this.camera.updateProjectionMatrix()

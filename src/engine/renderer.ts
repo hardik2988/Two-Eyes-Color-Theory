@@ -92,8 +92,8 @@ export class Renderer {
     this.camera = camera
     const size = this.gl.getSize(new THREE.Vector2())
     const target = new THREE.WebGLRenderTarget(size.x, size.y, {
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
     })
     this.composer = new EffectComposer(this.gl, target)
     this.composer.addPass(new RenderPass(scene, camera))
