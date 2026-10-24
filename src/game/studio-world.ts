@@ -894,6 +894,23 @@ export class StudioWorld {
     })
     this.mesh(p, new THREE.BoxGeometry(w - 0.18, h - 0.22, 0.015), artMat, [0, 0, 0.012])
 
+    // 4b. Low-Iron Museum Picture Glass Overlay (subtle specular reflection)
+    const pictureGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(w - 0.18, h - 0.22),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.15,
+        roughness: 0.08,
+        metalness: 0.05,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.06,
+        reflectivity: 0.5,
+      })
+    )
+    pictureGlass.position.set(0, 0, 0.021)
+    p.add(pictureGlass)
+
     // 5. Engraved Brass Museum Placard Underneath
     const placardTex = this.createPlacardTexture(title, harmony, 'Oil on Belgian Linen · 120 × 160 cm')
     const placardMat = new THREE.MeshStandardMaterial({

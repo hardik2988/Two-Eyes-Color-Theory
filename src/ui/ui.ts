@@ -177,6 +177,10 @@ export class Ui {
       prompt.hidden = target === null
       if (target) this.q('.studio-interact-label').textContent = target.label
     }
+    const reticle = this.q<HTMLElement>('.studio-crosshair')
+    if (reticle) {
+      reticle.classList.toggle('is-focused', target !== null)
+    }
     const help = this.q<HTMLElement>('.studio-controls')
     if (help) help.hidden = !showControls
     const notice = this.q<HTMLElement>('.studio-note')
@@ -193,6 +197,20 @@ export class Ui {
       if (objEl && objEl.textContent !== objectiveText) objEl.textContent = objectiveText
       const studioObjP = this.root.querySelector<HTMLElement>('.studio-objective p')
       if (studioObjP && studioObjP.textContent !== objectiveText) studioObjP.textContent = objectiveText
+
+      let stage = 1
+      if (objectiveText.includes('Installation 02') || objectiveText.includes('Value')) stage = 2
+      else if (objectiveText.includes('Installation 03') || objectiveText.includes('Harmonies')) stage = 3
+      else if (objectiveText.includes('Installation 04') || objectiveText.includes('Vault')) stage = 4
+
+      const progressLabel = this.root.querySelector<HTMLElement>('.hud-stations-progress')
+      if (progressLabel) progressLabel.textContent = `EXHIBITION 0${stage}/04`
+
+      const pips = this.root.querySelectorAll<HTMLElement>('.hud-station-pips .pip')
+      pips.forEach((pip, idx) => {
+        pip.classList.toggle('is-done', idx + 1 < stage)
+        pip.classList.toggle('is-active', idx + 1 === stage)
+      })
     }
   }
 
@@ -1021,20 +1039,32 @@ export class Ui {
 </section>
 
 <section class="screen screen-hud" data-screen="hud">
-  <div class="hud-objective glass-panel" aria-live="polite">
-    <span class="hud-objective-badge">OBJECTIVE</span>
-    <span class="hud-objective-text">Installation 01: The Mixing Bench · Subtractive Pigment Mixing</span>
-  </div>
   <header class="studio-hud-top">
     <div class="studio-hud-left">
-      <div class="studio-objective glass-panel"><span class="studio-objective-kicker" data-i18n="studio.stage"></span><strong data-i18n="studio.objective"></strong><p data-i18n="studio.objectiveCopy"></p></div>
+      <div class="hud-objective-card glass-panel" aria-live="polite">
+        <div class="hud-objective-header">
+          <span class="hud-objective-badge"><span class="hud-pulse-dot"></span>OBJECTIVE</span>
+          <span class="hud-stations-progress">EXHIBITION 01/04</span>
+        </div>
+        <div class="hud-objective-text">Installation 01: The Mixing Bench · Subtractive Pigment Mixing</div>
+        <div class="hud-station-pips" aria-hidden="true">
+          <span class="pip is-active" data-station="1"></span>
+          <span class="pip-line"></span>
+          <span class="pip" data-station="2"></span>
+          <span class="pip-line"></span>
+          <span class="pip" data-station="3"></span>
+          <span class="pip-line"></span>
+          <span class="pip" data-station="4"></span>
+        </div>
+      </div>
+    </div>
+    <div class="studio-hud-center">
       <aside class="studio-vision glass-panel" data-view="jack" role="status" aria-live="polite" aria-atomic="true">
         <span class="studio-vision-symbol" aria-hidden="true"></span>
         <span class="studio-vision-copy">
-          <strong class="vision-jack vision-aria" data-i18n="studio.vision.jack"></strong>
-          <strong class="vision-john vision-kai" data-i18n="studio.vision.john"></strong>
-          <small data-i18n="studio.visionHint"></small>
-          <em data-i18n="studio.visionDisclaimer"></em>
+          <strong class="vision-jack vision-aria" data-i18n="studio.vision.jack">Jack · Trichromatic</strong>
+          <strong class="vision-john vision-kai" data-i18n="studio.vision.john">John · Deuteranopia</strong>
+          <small data-i18n="studio.visionHint">[ TAB ] Switch Perspective</small>
         </span>
       </aside>
     </div>
@@ -1043,7 +1073,7 @@ export class Ui {
         <span class="hud-timer-label">EXHIBITION TIME</span>
         <strong class="hud-timer-clock">15:00</strong>
       </div>
-      <button class="hud-pause" data-action="pause" data-i18n-label="touch.pause">${ICON.pause}</button>
+      <button class="hud-pause" data-action="pause" data-i18n-label="touch.pause" aria-label="Pause Exhibition">${ICON.pause}</button>
     </div>
   </header>
   <div class="studio-crosshair" aria-hidden="true"><i></i><b></b></div>
