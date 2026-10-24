@@ -5,14 +5,15 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { DEUTERANOPIA_SHADER } from './color-vision'
+import { LENS_SHADER } from './lens-shader'
 import type { Quality } from './save'
 
 type Preset = { pixelRatio: number; shadows: boolean; shadowMap: number; bloom: boolean; antialias: boolean }
 export const QUALITY_PRESETS: Record<Quality, Preset> = {
   low: { pixelRatio: 1, shadows: false, shadowMap: 512, bloom: false, antialias: false },
   medium: { pixelRatio: 1.5, shadows: true, shadowMap: 1024, bloom: false, antialias: true },
-  high: { pixelRatio: 2, shadows: true, shadowMap: 2048, bloom: true, antialias: true },
-  ultra: { pixelRatio: 2.25, shadows: true, shadowMap: 4096, bloom: true, antialias: true },
+  high: { pixelRatio: 2.0, shadows: true, shadowMap: 2048, bloom: true, antialias: true },
+  ultra: { pixelRatio: 2.0, shadows: true, shadowMap: 4096, bloom: true, antialias: true },
 }
 
 /** Pick a starting quality from device hints; the player can override it in Settings. */
@@ -24,27 +25,35 @@ export function suggestQuality(): Quality {
 }
 
 /**
- * Owns the WebGL renderer, the optional post-processing chain and resize handling.
- * Scenes call `render(scene, camera)`; they never touch the composer directly.
+ * Owns the WebGL renderer, the post-processing chain and resize handling.
+ * Color-vision transform is guaranteed to execute as the final stage of the pipeline
+ * after tone mapping, bloom, and lens vignette so lighting never distorts the medical matrix.
  */
 export class Renderer {
   readonly gl: THREE.WebGLRenderer
   private composer?: EffectComposer
   private bloom?: UnrealBloomPass
+  private readonly lensPass: ShaderPass
   private readonly visionPass: ShaderPass
   private visionStrength_ = 0
   private visionTarget = 0
   private preset: Preset
   private scene?: THREE.Scene
   private camera?: THREE.PerspectiveCamera
+  private frameCount = 0
+  private lastFpsCheck = performance.now()
+  private lowFpsCounter = 0
+  private onAutoReduce?: (newQuality: Quality) => void
 
   constructor(readonly canvas: HTMLCanvasElement, quality: Quality) {
     this.preset = QUALITY_PRESETS[quality]
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: this.preset.antialias, powerPreference: 'high-performance' })
     this.gl.outputColorSpace = THREE.SRGBColorSpace
     this.gl.toneMapping = THREE.ACESFilmicToneMapping
-    this.gl.toneMappingExposure = 1
+    this.gl.toneMappingExposure = 0.92
     this.gl.shadowMap.type = THREE.PCFSoftShadowMap
+
+    this.lensPass = new ShaderPass(LENS_SHADER)
     this.visionPass = new ShaderPass(DEUTERANOPIA_SHADER)
     this.applyQuality(quality)
     window.addEventListener('resize', () => this.resize())
@@ -60,6 +69,10 @@ export class Renderer {
 
   get visionPassCount(): number {
     return 1
+  }
+
+  setAutoReduceCallback(cb: (newQuality: Quality) => void): void {
+    this.onAutoReduce = cb
   }
 
   setVisionMode(mode: 'jack' | 'john' | 'aria' | 'kai', reducedMotion = false): void {
@@ -78,7 +91,7 @@ export class Renderer {
   applyQuality(quality: Quality): void {
     this.preset = QUALITY_PRESETS[quality]
     this.gl.shadowMap.enabled = this.preset.shadows
-    this.gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio))
+    this.gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio, 2.0))
     this.bloom?.dispose()
     this.composer?.dispose()
     this.composer = undefined
@@ -96,14 +109,25 @@ export class Renderer {
       magFilter: THREE.LinearFilter,
     })
     this.composer = new EffectComposer(this.gl, target)
+
+    // 1. Base 3D Scene Render Pass
     this.composer.addPass(new RenderPass(scene, camera))
-    // The single custom pass sanitizes source pixels and applies Kai's matrix before bloom.
-    this.composer.addPass(this.visionPass)
+
+    // 2. Optical Bloom (Architectural highlight glow on daylight sunbeams and gallery sconces)
     if (this.preset.bloom) {
-      this.bloom = new UnrealBloomPass(size, 0.45, 0.3, 1.6)
+      this.bloom = new UnrealBloomPass(size, 0.32, 0.25, 1.15)
       this.composer.addPass(this.bloom)
     }
+
+    // 3. ACES Filmic Tone Mapping and sRGB output encoding
     this.composer.addPass(new OutputPass())
+
+    // 4. Subtle Architectural Lens Vignette and Microscopic Film Grain
+    this.composer.addPass(this.lensPass)
+
+    // 5. FINAL PASS: Color-Vision Simulation (Applied LAST so post-processing never corrupts deuteranopia matrix)
+    this.composer.addPass(this.visionPass)
+
     this.composer.setSize(size.x, size.y)
     return this.composer
   }
@@ -126,6 +150,27 @@ export class Renderer {
       camera.aspect = w / h
       camera.updateProjectionMatrix()
     }
+
+    // Adaptive Performance Monitor (60 FPS target, auto-reduce quality if below ~50 FPS for sustained period)
+    this.frameCount++
+    const now = performance.now()
+    if (now - this.lastFpsCheck >= 1000) {
+      const fps = (this.frameCount * 1000) / (now - this.lastFpsCheck)
+      this.frameCount = 0
+      this.lastFpsCheck = now
+
+      if (fps < 48 && this.gl.shadowMap.enabled) {
+        this.lowFpsCounter++
+        if (this.lowFpsCounter >= 3) {
+          this.lowFpsCounter = 0
+          this.onAutoReduce?.('medium')
+        }
+      } else {
+        this.lowFpsCounter = Math.max(0, this.lowFpsCounter - 1)
+      }
+    }
+
+    this.lensPass.uniforms.uTime.value = performance.now() * 0.001
     this.ensureComposer(scene, camera).render()
   }
 }

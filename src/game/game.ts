@@ -19,7 +19,14 @@ export type Compass = { angle: number; distance: number; rise: number }
 /** One persistent luxury daylight room and one renderer: no duplicate scenes are created. */
 export class Game {
   mode: Mode = 'attract'
-  reducedMotion = false
+  private reducedMotion_ = false
+  get reducedMotion(): boolean {
+    return this.reducedMotion_
+  }
+  set reducedMotion(val: boolean) {
+    this.reducedMotion_ = val
+    if (this.player) this.player.reducedMotion = val
+  }
   helpVisible = false
   perspective: Perspective = 'jack'
   note = ''

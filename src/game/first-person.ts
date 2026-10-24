@@ -36,6 +36,7 @@ export class FirstPersonController {
   readonly collider: RAPIER.Collider
   readonly controller: RAPIER.KinematicCharacterController
   readonly position = new THREE.Vector3()
+  reducedMotion = false
   /** Aim the opening reticle at a labelled tin rather than the gap between the four props. */
   yaw = 0.14
   pitch = -0.14
@@ -46,9 +47,12 @@ export class FirstPersonController {
   private targetEyeOffset = CAMERA_VIEW_OFFSETS.jack.eye
   private targetSideOffset = CAMERA_VIEW_OFFSETS.jack.side
   private walkTime = 0
+  private idleTime = 0
   private bobY = 0
   private swayX = 0
   private rollZ = 0
+  private currentFov = CONFIG.camera.fov
+  private baseFov = CONFIG.camera.fov
 
   constructor(private readonly physics: Physics, spawn: THREE.Vector3, aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, aspect, 0.06, 45)
@@ -80,9 +84,10 @@ export class FirstPersonController {
     const values = CONFIG.exploration
     const speed = input.sprint ? values.sprintSpeed : values.walkSpeed
     const wish = movementVelocity(input.x, input.y, this.yaw, speed)
-    const smoothing = 1 - Math.exp(-values.acceleration * dt)
-    this.velocity.x += (wish.x - this.velocity.x) * smoothing
-    this.velocity.z += (wish.z - this.velocity.z) * smoothing
+
+    // Frame-rate independent velocity damping with acceleration curve
+    this.velocity.x = THREE.MathUtils.damp(this.velocity.x, wish.x, values.acceleration, dt)
+    this.velocity.z = THREE.MathUtils.damp(this.velocity.z, wish.z, values.acceleration, dt)
     this.velocity.y = Math.max(-14, this.velocity.y + values.gravity * dt)
 
     const current = this.body.translation()
@@ -99,20 +104,39 @@ export class FirstPersonController {
     this.position.set(next.x, next.y, next.z)
     this.physics.step(dt)
 
-    // Ultra-smooth architectural head bob & natural gait sway
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z)
-    if (grounded && horizontalSpeed > 0.25) {
+
+    // Dynamic Sprint FOV Kick (smooth lens expansion upon accelerating)
+    const targetFov = (input.sprint && horizontalSpeed > 0.6 && !this.reducedMotion)
+      ? CONFIG.camera.fov + 3.8
+      : CONFIG.camera.fov
+    this.currentFov = THREE.MathUtils.damp(this.currentFov, targetFov, 7.5, dt)
+    if (Math.abs(this.camera.fov - this.currentFov) > 0.01) {
+      this.camera.fov = this.currentFov
+      this.camera.updateProjectionMatrix()
+    }
+
+    // Ultra-smooth architectural head bob & natural gait sway
+    if (!this.reducedMotion && grounded && horizontalSpeed > 0.25) {
       this.walkTime += dt * (input.sprint ? 12.5 : 8.5)
-      const targetBob = Math.sin(this.walkTime) * 0.015
-      const targetSway = Math.cos(this.walkTime * 0.5) * 0.009
-      const targetRoll = Math.sin(this.walkTime * 0.5) * 0.0025
-      this.bobY += (targetBob - this.bobY) * (1 - Math.exp(-12 * dt))
-      this.swayX += (targetSway - this.swayX) * (1 - Math.exp(-12 * dt))
-      this.rollZ += (targetRoll - this.rollZ) * (1 - Math.exp(-12 * dt))
+      const targetBob = Math.sin(this.walkTime) * 0.014
+      const targetSway = Math.cos(this.walkTime * 0.5) * 0.008
+      const targetRoll = Math.sin(this.walkTime * 0.5) * 0.0022
+      this.bobY = THREE.MathUtils.damp(this.bobY, targetBob, 12, dt)
+      this.swayX = THREE.MathUtils.damp(this.swayX, targetSway, 12, dt)
+      this.rollZ = THREE.MathUtils.damp(this.rollZ, targetRoll, 12, dt)
+    } else if (!this.reducedMotion && grounded) {
+      // Subtle architectural idle breathing
+      this.idleTime += dt
+      const targetBob = Math.sin(this.idleTime * 1.6) * 0.0025
+      const targetSway = Math.cos(this.idleTime * 0.8) * 0.0018
+      this.bobY = THREE.MathUtils.damp(this.bobY, targetBob, 4, dt)
+      this.swayX = THREE.MathUtils.damp(this.swayX, targetSway, 4, dt)
+      this.rollZ = THREE.MathUtils.damp(this.rollZ, 0, 10, dt)
     } else {
-      this.bobY += (0 - this.bobY) * (1 - Math.exp(-10 * dt))
-      this.swayX += (0 - this.swayX) * (1 - Math.exp(-10 * dt))
-      this.rollZ += (0 - this.rollZ) * (1 - Math.exp(-10 * dt))
+      this.bobY = THREE.MathUtils.damp(this.bobY, 0, 12, dt)
+      this.swayX = THREE.MathUtils.damp(this.swayX, 0, 12, dt)
+      this.rollZ = THREE.MathUtils.damp(this.rollZ, 0, 12, dt)
     }
 
     this.advancePerspective(dt)
@@ -125,9 +149,13 @@ export class FirstPersonController {
     this.position.copy(spawn)
     this.velocity.set(0, 0, 0)
     this.walkTime = 0
+    this.idleTime = 0
     this.bobY = 0
     this.swayX = 0
     this.rollZ = 0
+    this.currentFov = CONFIG.camera.fov
+    this.camera.fov = CONFIG.camera.fov
+    this.camera.updateProjectionMatrix()
     this.yaw = 0.14
     this.pitch = -0.14
     this.setPerspective('jack', true)
@@ -162,7 +190,9 @@ export class FirstPersonController {
       at.z - Math.sin(this.yaw) * (this.sideOffset + this.swayX),
     )
     this.camera.rotation.set(this.pitch, this.yaw, this.rollZ, 'YXZ')
-    if (this.camera.fov !== CONFIG.camera.fov) {
+    if (this.baseFov !== CONFIG.camera.fov) {
+      this.baseFov = CONFIG.camera.fov
+      this.currentFov = CONFIG.camera.fov
       this.camera.fov = CONFIG.camera.fov
       this.camera.updateProjectionMatrix()
     }

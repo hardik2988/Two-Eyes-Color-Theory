@@ -94,6 +94,25 @@ async function boot(): Promise<void> {
   }
 
   const renderer = new Renderer(canvas, save.data.quality)
+  renderer.setAutoReduceCallback(newQuality => {
+    save.update({ quality: newQuality })
+    applySettings(save.data)
+    game?.setQuality(newQuality)
+    ui.refreshSettings()
+  })
+
+  // Dev-only FPS & Draw-call Performance Overlay (Toggle with ` or F3)
+  const statsEl = document.createElement('div')
+  statsEl.style.cssText = 'position:fixed;bottom:10px;right:10px;padding:6px 10px;background:rgba(0,48,73,0.88);color:#fdf0d5;font-family:monospace;font-size:11px;border-radius:4px;border:1px solid rgba(253,240,213,0.3);z-index:9999;pointer-events:none;display:none;'
+  document.body.appendChild(statsEl)
+  let statsVisible = false
+  window.addEventListener('keydown', e => {
+    if (e.key === '`' || e.key === 'F3') {
+      statsVisible = !statsVisible
+      statsEl.style.display = statsVisible ? 'block' : 'none'
+    }
+  })
+
   game = new Game(renderer, input, audio)
   game.reducedMotion = save.data.reducedMotion
   game.timer.setUntimed(save.data.untimedMode)
@@ -144,6 +163,10 @@ async function boot(): Promise<void> {
       ui.frame(frameSeconds)
       loop.paused = g.mode === 'paused'
       g.render(alpha, frameSeconds)
+      if (statsVisible) {
+        const info = renderer.gl.info
+        statsEl.innerText = `FPS: ${Math.round(1 / Math.max(0.001, frameSeconds))} | Calls: ${info.render.calls} | Tris: ${info.render.triangles}`
+      }
       if (g.mode === 'playing') ui.updateStudioHud(g.focusedTarget, g.note, g.helpVisible, g.perspective, g.timer.formatted, g.currentObjective)
     },
   })

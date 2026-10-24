@@ -14,10 +14,11 @@ export type StudioTarget = {
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 
 /**
- * Ultra-Realistic Daylight Art Studio & Luxury Architectural Exhibition Gallery.
- * Features photorealistic PBR materials (French White Oak plank floor, Venetian lime plaster,
- * fluted walnut acoustic batten wall, travertine limestone, champagne bronze, brushed brass),
- * dramatic natural sunlight with soft shadows, 4 museum-grade fine art oil paintings with
+ * Architectural Visualization Standard — Luxury Daylight Art Studio ("Daylight Studio").
+ * Features photorealistic PBR materials (French White Oak plank floor with clearcoat and normal maps,
+ * Venetian lime plaster, fluted dark walnut acoustic battens, travertine limestone ashlar,
+ * transparent daylight architectural glass with garden sky panoramas beyond, champagne bronze),
+ * soft natural sun with PCF soft shadows, 4 museum-grade fine art oil paintings with
  * canvas weave and engraved brass placards, wooden fine-art shipping crates, cardboard boxes,
  * artist oil paint tubes, palettes, brushes, books, and studio props.
  */
@@ -48,7 +49,7 @@ export class StudioWorld {
     darkWood: THREE.MeshStandardMaterial
     canvas: THREE.MeshStandardMaterial
     clearGlass: THREE.MeshStandardMaterial
-    skylightGlass: THREE.MeshStandardMaterial
+    windowGlass: THREE.MeshPhysicalMaterial
     blackSteel: THREE.MeshStandardMaterial
     leaf: THREE.MeshStandardMaterial
     pottery: THREE.MeshStandardMaterial
@@ -57,17 +58,35 @@ export class StudioWorld {
   }
 
   constructor(readonly physics: Physics, renderer: Renderer) {
-    // Elegant warm gallery ambient background
-    this.scene.background = new THREE.Color(0xf1ece1)
-    this.scene.fog = new THREE.Fog(0xf0ebe0, 24, 52)
+    // Warm natural daylight gallery background
+    this.scene.background = new THREE.Color(0xf2ece2)
+    this.scene.fog = new THREE.Fog(0xf1ebe0, 24, 52)
 
-    // HDRI Ambient Environment Reflections
+    // 1. Initial PMREM RoomEnvironment for immediate synchronous display
     const room = new RoomEnvironment()
     const pmrem = new THREE.PMREMGenerator(renderer.gl)
     this.environment = pmrem.fromScene(room, 0.04).texture
     this.scene.environment = this.environment
-    this.scene.environmentIntensity = 0.48
+    this.scene.environmentIntensity = 0.52
     pmrem.dispose()
+
+    // 2. Asynchronously load 1K studio HDR environment from public/environments/
+    if (typeof window !== 'undefined') {
+      import('three/examples/jsm/loaders/RGBELoader.js')
+        .then(({ RGBELoader }) => {
+          new RGBELoader().load(
+            '/environments/studio_small_08_1k.hdr',
+            hdrTexture => {
+              hdrTexture.mapping = THREE.EquirectangularReflectionMapping
+              this.scene.environment = hdrTexture
+              this.scene.environmentIntensity = 0.48
+            },
+            undefined,
+            () => {},
+          )
+        })
+        .catch(() => {})
+    }
 
     this.initMaterials()
     this.addDaylightLighting()
@@ -113,7 +132,7 @@ export class StudioWorld {
     this.objectiveBeacon.position.copy(this.beaconTargetPos)
     this.scene.add(this.objectiveBeacon)
 
-    // Glowing Floor Projection Waypoint Ring
+    // Glowing Floor Projection Waypoint Ring (soft pulse)
     this.floorWaypointRing = new THREE.Group()
     const floorOuter = new THREE.Mesh(
       new THREE.TorusGeometry(0.85, 0.025, 8, 48),
@@ -151,6 +170,7 @@ export class StudioWorld {
     const plasterTex = this.createPlasterTexture()
     const travertineTex = this.createTravertineTexture()
     const woodSlatTex = this.createWoodSlatTexture()
+    const woodSlatNormal = this.createWoodSlatNormal()
     const cardboardTex = this.createCardboardTexture()
     const crateTex = this.createCrateTexture()
 
@@ -162,13 +182,15 @@ export class StudioWorld {
       }),
       wallDark: new THREE.MeshStandardMaterial({
         map: plasterTex,
-        color: 0xe2dcd0,
+        color: 0xe0dad0,
         roughness: 0.85,
         metalness: 0.02,
       }),
       woodSlat: new THREE.MeshStandardMaterial({
         map: woodSlatTex,
-        roughness: 0.45,
+        normalMap: woodSlatNormal,
+        normalScale: new THREE.Vector2(0.85, 0.85),
+        roughness: 0.42,
         metalness: 0.04,
       }),
       travertine: new THREE.MeshStandardMaterial({
@@ -176,11 +198,11 @@ export class StudioWorld {
         roughness: 0.68,
         metalness: 0.04,
       }),
-      trim: new THREE.MeshStandardMaterial({ color: 0x242b33, roughness: 0.32, metalness: 0.8 }),
-      brass: new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.22, metalness: 0.9 }),
-      champagneBronze: new THREE.MeshStandardMaterial({ color: 0xc8b28a, roughness: 0.3, metalness: 0.84 }),
-      wood: new THREE.MeshStandardMaterial({ color: 0x8a6245, roughness: 0.5, metalness: 0.02 }),
-      darkWood: new THREE.MeshStandardMaterial({ color: 0x36281e, roughness: 0.54, metalness: 0.04 }),
+      trim: new THREE.MeshStandardMaterial({ color: 0x22272e, roughness: 0.28, metalness: 0.82 }),
+      brass: new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.92 }),
+      champagneBronze: new THREE.MeshStandardMaterial({ color: 0xc8b28a, roughness: 0.28, metalness: 0.86 }),
+      wood: new THREE.MeshStandardMaterial({ color: 0x8a6245, roughness: 0.48, metalness: 0.02 }),
+      darkWood: new THREE.MeshStandardMaterial({ color: 0x36281e, roughness: 0.52, metalness: 0.04 }),
       canvas: new THREE.MeshStandardMaterial({ color: 0xfdfaf5, roughness: 0.94, metalness: 0.0 }),
       clearGlass: new THREE.MeshStandardMaterial({
         color: 0xe8f4fc,
@@ -189,15 +211,18 @@ export class StudioWorld {
         transparent: true,
         opacity: 0.32,
       }),
-      skylightGlass: new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        emissive: 0xebf5fb,
-        emissiveIntensity: 0.85,
-        roughness: 0.18,
+      windowGlass: new THREE.MeshPhysicalMaterial({
+        color: 0xebf5fc,
+        roughness: 0.04,
+        metalness: 0.05,
+        transmission: 0.85,
+        thickness: 0.06,
+        transparent: true,
+        opacity: 0.36,
       }),
-      blackSteel: new THREE.MeshStandardMaterial({ color: 0x1b2026, roughness: 0.38, metalness: 0.7 }),
-      leaf: new THREE.MeshStandardMaterial({ color: 0x1e492b, roughness: 0.55, metalness: 0.04 }),
-      pottery: new THREE.MeshStandardMaterial({ color: 0xba6a4e, roughness: 0.78, metalness: 0.02 }),
+      blackSteel: new THREE.MeshStandardMaterial({ color: 0x1b2026, roughness: 0.36, metalness: 0.75 }),
+      leaf: new THREE.MeshStandardMaterial({ color: 0x1e492b, roughness: 0.52, metalness: 0.04 }),
+      pottery: new THREE.MeshStandardMaterial({ color: 0xba6a4e, roughness: 0.76, metalness: 0.02 }),
       cardboard: new THREE.MeshStandardMaterial({
         map: cardboardTex,
         roughness: 0.82,
@@ -245,12 +270,8 @@ export class StudioWorld {
     }
   }
 
-  private currentHoverTarget: StudioTarget | null = null
-
-  setTargetHover(target: StudioTarget | null): void {
-    if (this.currentHoverTarget === target) return
-    this.currentHoverTarget = target
-    // Clean, non-destructive hover state (the game already highlights with 3D beacons, floor decals, reticle, and HUD)
+  setTargetHover(_target: StudioTarget | null): void {
+    // Non-destructive hover state: preserves authentic wood, plaster, and bronze materials
   }
 
   update(time: number, delta: number): void {
@@ -263,8 +284,8 @@ export class StudioWorld {
     if (this.floorWaypointRing.visible) {
       this.floorWaypointRing.position.x = this.floorRingTargetPos.x
       this.floorWaypointRing.position.z = this.floorRingTargetPos.z
-      this.floorWaypointRing.rotation.y += delta * 0.4
-      const pulse = 1 + Math.sin(time * 2.8) * 0.05
+      this.floorWaypointRing.rotation.y += delta * 0.35
+      const pulse = 1 + Math.sin(time * 2.5) * 0.045
       this.floorWaypointRing.scale.set(pulse, 1, pulse)
     }
 
@@ -289,14 +310,14 @@ export class StudioWorld {
 
   private addDaylightLighting(): void {
     // Balanced realistic daylight sky & ground bounce
-    const skyFill = new THREE.HemisphereLight(0xe6f2ff, 0xfbf1de, 0.55)
+    const skyFill = new THREE.HemisphereLight(0xe5f0ff, 0xfaf0dc, 0.52)
     this.scene.add(skyFill)
 
-    const ambient = new THREE.AmbientLight(0xfffaee, 0.22)
+    const ambient = new THREE.AmbientLight(0xfffaee, 0.2)
     this.scene.add(ambient)
 
     // Warm natural sun streaming through large floor-to-ceiling West windows
-    const sun = new THREE.DirectionalLight(0xfff5e0, 2.6)
+    const sun = new THREE.DirectionalLight(0xfff5df, 2.75)
     this.keyLight = sun
     sun.position.set(-8.8, 9.5, -3.0)
     sun.castShadow = true
@@ -305,7 +326,7 @@ export class StudioWorld {
     sun.shadow.camera.right = 11
     sun.shadow.camera.top = 9
     sun.shadow.camera.bottom = -9
-    sun.shadow.bias = -0.00018
+    sun.shadow.bias = -0.00015
     sun.shadow.normalBias = 0.024
     this.scene.add(sun)
 
@@ -330,7 +351,7 @@ export class StudioWorld {
   }
 
   private buildRoom(): void {
-    // 1. Natural French White Oak Plank Flooring (High resolution PBR texture)
+    // 1. Natural French White Oak Plank Flooring (PBR MeshPhysicalMaterial with Clearcoat & Normal Map)
     this.box('Studio floor', v3(18, 0.36, 15), v3(0, -0.18, 0), this.floorMaterial(), true)
 
     // 2. Ivory Architectural Ceiling with Recessed Light Channels
@@ -357,17 +378,32 @@ export class StudioWorld {
       this.box('Crown cornice', v3(17.2, 0.14, 0.12), v3(0, 5.48, z), this.mats.trim, false)
     }
 
-    // Floor-to-ceiling Architectural Windows with Daylight Glass
+    // Floor-to-ceiling Architectural Windows with Daylight Glass & Exterior Panoramic Views
+    const skyBackdropTex = this.createExteriorBackdropTexture()
+    const skyBackdropMat = new THREE.MeshBasicMaterial({ map: skyBackdropTex, side: THREE.DoubleSide })
+
+    // West Exterior Sky Backdrop Panel
+    const westSky = new THREE.Mesh(new THREE.PlaneGeometry(14.8, 5.2), skyBackdropMat)
+    westSky.position.set(-9.6, 2.8, 0)
+    westSky.rotation.y = Math.PI / 2
+    this.scene.add(westSky)
+
+    // East Exterior Sky Backdrop Panel
+    const eastSky = new THREE.Mesh(new THREE.PlaneGeometry(14.8, 5.2), skyBackdropMat)
+    eastSky.position.set(9.6, 2.8, 0)
+    eastSky.rotation.y = -Math.PI / 2
+    this.scene.add(eastSky)
+
     for (const z of [-4.35, 0, 4.35]) {
-      // West window apertures
-      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(-8.79, 2.7, z), this.mats.skylightGlass, false)
+      // West window apertures with transparent architectural glass
+      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(-8.79, 2.7, z), this.mats.windowGlass, false)
       this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z - 1.5), this.mats.blackSteel, false)
       this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(-8.73, 2.7, z + 1.5), this.mats.blackSteel, false)
       this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(-8.73, 2.7, z), this.mats.blackSteel, false)
       this.box('Window sill', v3(0.24, 0.08, 3.2), v3(-8.7, 0.78, z), this.mats.wood, false)
 
-      // East window apertures
-      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(8.79, 2.7, z), this.mats.skylightGlass, false)
+      // East window apertures with transparent architectural glass
+      this.box('Daylight window', v3(0.04, 3.8, 3.1), v3(8.79, 2.7, z), this.mats.windowGlass, false)
       this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z - 1.5), this.mats.blackSteel, false)
       this.box('Window frame vertical', v3(0.08, 3.85, 0.08), v3(8.73, 2.7, z + 1.5), this.mats.blackSteel, false)
       this.box('Window frame mid', v3(0.06, 0.06, 3.0), v3(8.73, 2.7, z), this.mats.blackSteel, false)
@@ -378,7 +414,7 @@ export class StudioWorld {
     const sunbeamMat = new THREE.MeshBasicMaterial({
       color: 0xfff6e4,
       transparent: true,
-      opacity: 0.04,
+      opacity: 0.038,
       side: THREE.DoubleSide,
       depthWrite: false,
     })
@@ -537,8 +573,14 @@ export class StudioWorld {
       can.position.set(cx, 1.01, 0.03)
       object.add(can)
 
-      const bodyMat = new THREE.MeshStandardMaterial({ color: canColors[i], roughness: 0.42, metalness: 0.28 })
+      // Realistic metallic specular body with colored paint coating
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: canColors[i],
+        roughness: 0.38,
+        metalness: 0.45,
+      })
       this.mesh(can, new THREE.CylinderGeometry(0.205, 0.22, 0.48, 24), bodyMat, [0, 0.25, 0])
+      // Brushed brass metallic rim & handle
       this.mesh(can, new THREE.CylinderGeometry(0.213, 0.213, 0.045, 24), this.mats.brass, [0, 0.504, 0])
       this.mesh(can, new THREE.CylinderGeometry(0.208, 0.208, 0.035, 24), this.mats.brass, [0, 0.02, 0])
 
@@ -628,7 +670,6 @@ export class StudioWorld {
     this.targets.push(target)
 
     // ─── 1. Architectural Dark Walnut Fluted Wood Batten Feature Wall ───────
-    // Fills South Wall backdrop behind the paintings with vertical slats and warm LED cove lighting
     const featureWall = new THREE.Mesh(
       new THREE.BoxGeometry(16.8, 5.4, 0.08),
       this.mats.woodSlat,
@@ -653,7 +694,7 @@ export class StudioWorld {
 
     // ─── 2. Centerpiece Interactive Curator Podium at X=0, Z=6.35 ─────────
     const podium = new THREE.Group()
-    podium.position.set(0, 0, -0.85) // World Z = 7.2 - 0.85 = 6.35 (in front of South Wall)
+    podium.position.set(0, 0, -0.85) // World Z = 7.2 - 0.85 = 6.35
     podium.rotation.y = Math.PI // Faces player approaching from north
     object.add(podium)
 
@@ -777,8 +818,7 @@ export class StudioWorld {
   ): void {
     const p = new THREE.Group()
     p.position.set(x, y, z)
-    // Rotate 180 degrees so front face of canvas faces INTO the room (-Z)
-    p.rotation.y = Math.PI
+    p.rotation.y = Math.PI // Faces room
     parent.add(p)
 
     const w = 1.35
@@ -794,12 +834,14 @@ export class StudioWorld {
     // 3. Off-White Museum Cotton Mat Border
     this.mesh(p, new THREE.BoxGeometry(w, h, 0.01), this.mats.canvas, [0, 0, 0.005])
 
-    // 4. Fine Art Canvas with CanvasTexture
+    // 4. Fine Art Canvas with CanvasTexture & Subtle Gloss Varnish Sheen
     const artTexture = this.createArtworkTexture(type)
-    const artMat = new THREE.MeshStandardMaterial({
+    const artMat = new THREE.MeshPhysicalMaterial({
       map: artTexture,
-      roughness: 0.78,
+      roughness: 0.65,
       metalness: 0.02,
+      clearcoat: 0.22,
+      clearcoatRoughness: 0.35,
     })
     this.mesh(p, new THREE.BoxGeometry(w - 0.18, h - 0.22, 0.015), artMat, [0, 0, 0.012])
 
@@ -828,7 +870,6 @@ export class StudioWorld {
     sconceHead.position.set(0, h / 2 + 0.22, 0.24)
     p.add(sconceHead)
 
-    // Tag every child mesh for interaction raycasting
     p.traverse(child => {
       child.userData.interaction = target
     })
@@ -963,14 +1004,12 @@ export class StudioWorld {
 
   // ─── Studio Props Implementations ──────────────────────────────────────
 
-  /** Adds a wooden fine-art transport shipping crate with metal brackets and stencil markings */
   private addShippingCrate(parent: THREE.Object3D, center: THREE.Vector3, size: THREE.Vector3, rotY: number, _label: string): void {
     const crate = new THREE.Group()
     crate.position.copy(center)
     crate.rotation.y = rotY
     parent.add(crate)
 
-    // Main box body with slatted crate texture
     this.mesh(crate, new THREE.BoxGeometry(size.x, size.y, size.z), this.mats.crate, [0, 0, 0])
 
     // Dark iron corner reinforcements
@@ -996,7 +1035,6 @@ export class StudioWorld {
     this.physics.addStaticBox(center, size)
   }
 
-  /** Adds a realistic kraft cardboard box with packaging tape and shipping label */
   private addCardboardBox(parent: THREE.Object3D, center: THREE.Vector3, size: THREE.Vector3, rotY: number, _hasOpenLid: boolean): void {
     const box = new THREE.Group()
     box.position.copy(center)
@@ -1005,7 +1043,6 @@ export class StudioWorld {
 
     this.mesh(box, new THREE.BoxGeometry(size.x, size.y, size.z), this.mats.cardboard, [0, 0, 0])
 
-    // Clear / brown packaging tape strip running across center top seam
     const tapeMat = new THREE.MeshStandardMaterial({
       color: 0xb58b56,
       roughness: 0.35,
@@ -1016,7 +1053,6 @@ export class StudioWorld {
     this.physics.addStaticBox(center, size)
   }
 
-  /** Adds a cluster of stretched artist canvases leaning against a wall */
   private addLeaningCanvases(parent: THREE.Object3D, base: THREE.Vector3, rotY: number): void {
     const cluster = new THREE.Group()
     cluster.position.copy(base)
@@ -1036,14 +1072,11 @@ export class StudioWorld {
       canvasGroup.rotation.x = s.tilt
       cluster.add(canvasGroup)
 
-      // Wooden stretcher frame
       this.mesh(canvasGroup, new THREE.BoxGeometry(s.w, s.h, s.d), this.mats.wood, [0, 0, 0])
-      // Stretched raw linen canvas backing
       this.mesh(canvasGroup, new THREE.BoxGeometry(s.w - 0.08, s.h - 0.08, 0.01), this.mats.canvas, [0, 0, -s.d / 2 - 0.005])
     }
   }
 
-  /** Stacks of hardcover art reference monographs */
   private addBookStack(parent: THREE.Object3D, center: THREE.Vector3, count: number): void {
     const bookColors = [0x780000, 0x003049, 0x669bbc, 0x3d2f24, 0xb91c1c]
     const titles = ['Interaction of Color', 'Theory of Colours', 'De Stijl', 'Bauhaus 1919-1933', 'Modernist Palette']
@@ -1058,7 +1091,6 @@ export class StudioWorld {
         roughness: 0.6,
       })
       this.mesh(b, new THREE.BoxGeometry(0.38, 0.048, 0.52), coverMat, [0, 0, 0])
-      // White paper page block
       this.mesh(b, new THREE.BoxGeometry(0.36, 0.044, 0.5), new THREE.MeshStandardMaterial({
         color: 0xfbf8ee,
         roughness: 0.9,
@@ -1066,7 +1098,6 @@ export class StudioWorld {
     }
   }
 
-  /** Articulated wooden artist drawing mannequin */
   private addDrawingMannequin(parent: THREE.Object3D, pos: THREE.Vector3): void {
     const m = new THREE.Group()
     m.position.copy(pos)
@@ -1075,53 +1106,42 @@ export class StudioWorld {
     const woodMat = this.mats.wood
     const brassMat = this.mats.brass
 
-    // Base stand and metal support rod
     this.mesh(m, new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16), woodMat, [0, 0.01, 0])
     this.mesh(m, new THREE.CylinderGeometry(0.006, 0.006, 0.42, 8), brassMat, [0, 0.21, 0])
+    this.mesh(m, new THREE.SphereGeometry(0.038, 12, 10), woodMat, [0, 0.22, 0])
+    this.mesh(m, new THREE.CylinderGeometry(0.042, 0.036, 0.14, 12), woodMat, [0, 0.32, 0])
+    this.mesh(m, new THREE.SphereGeometry(0.032, 12, 10), woodMat, [0, 0.43, 0])
 
-    // Torso, head, pelvis
-    this.mesh(m, new THREE.SphereGeometry(0.038, 12, 10), woodMat, [0, 0.22, 0]) // pelvis
-    this.mesh(m, new THREE.CylinderGeometry(0.042, 0.036, 0.14, 12), woodMat, [0, 0.32, 0]) // chest
-    this.mesh(m, new THREE.SphereGeometry(0.032, 12, 10), woodMat, [0, 0.43, 0]) // head
-
-    // Limbs in expressive pose
     const leftArm = this.mesh(m, new THREE.CylinderGeometry(0.012, 0.01, 0.12, 8), woodMat, [-0.07, 0.32, 0.04])
     leftArm.rotation.z = 0.6
     const rightArm = this.mesh(m, new THREE.CylinderGeometry(0.012, 0.01, 0.12, 8), woodMat, [0.07, 0.34, -0.04])
     rightArm.rotation.z = -0.8
   }
 
-  /** Classical plaster sculpture bust on travertine pedestal in window bay */
   private addPlasterBust(parent: THREE.Object3D, pos: THREE.Vector3): void {
     const g = new THREE.Group()
     g.position.copy(pos)
     parent.add(g)
 
-    // Travertine architectural pedestal
     this.mesh(g, new THREE.BoxGeometry(0.55, 1.1, 0.55), this.mats.travertine, [0, 0.55, 0])
     this.mesh(g, new THREE.BoxGeometry(0.62, 0.08, 0.62), this.mats.brass, [0, 1.14, 0])
 
-    // Plaster bust sculpture
     const plasterMat = new THREE.MeshStandardMaterial({
       color: 0xf5f2eb,
-      roughness: 0.92,
+      roughness: 0.9,
       metalness: 0.0,
     })
     const bust = new THREE.Group()
     bust.position.set(0, 1.18, 0)
     g.add(bust)
 
-    // Torso shoulders
     this.mesh(bust, new THREE.BoxGeometry(0.42, 0.24, 0.22), plasterMat, [0, 0.12, 0])
-    // Neck
     this.mesh(bust, new THREE.CylinderGeometry(0.08, 0.09, 0.16, 16), plasterMat, [0, 0.28, 0])
-    // Head with classical proportions
     this.mesh(bust, new THREE.SphereGeometry(0.14, 20, 16), plasterMat, [0, 0.45, 0])
 
     this.physics.addStaticBox(v3(pos.x, 0.55, pos.z), v3(0.55, 1.1, 0.55))
   }
 
-  /** Brass umbrella container with rolled blueprints and mailing tubes */
   private addBlueprintTubeBin(parent: THREE.Object3D, pos: THREE.Vector3): void {
     const bin = new THREE.Group()
     bin.position.copy(pos)
@@ -1129,7 +1149,6 @@ export class StudioWorld {
 
     this.mesh(bin, new THREE.CylinderGeometry(0.22, 0.22, 0.65, 20), this.mats.brass, [0, 0.325, 0])
 
-    // Assorted rolled blueprints and mailing tubes
     for (let i = 0; i < 5; i++) {
       const tube = this.mesh(bin, new THREE.CylinderGeometry(0.038, 0.038, 0.95, 12), this.mats.cardboard, [
         Math.cos(i * 1.25) * 0.1,
@@ -1140,7 +1159,49 @@ export class StudioWorld {
     }
   }
 
-  // ─── Procedural High-Resolution Texture Generators ─────────────────────
+  // ─── Procedural PBR Canvas Texture Generators ──────────────────────────
+
+  private createExteriorBackdropTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')!
+
+    // Soft architectural daylight gradient (sky to horizon)
+    const sky = ctx.createLinearGradient(0, 0, 0, 512)
+    sky.addColorStop(0, '#7eb7e8')
+    sky.addColorStop(0.5, '#cfe5f8')
+    sky.addColorStop(0.72, '#fff6e4')
+    sky.addColorStop(1, '#e8f0d8')
+    ctx.fillStyle = sky
+    ctx.fillRect(0, 0, 1024, 512)
+
+    // Soft warm horizon sun bloom glow
+    const sunBloom = ctx.createRadialGradient(280, 360, 20, 280, 360, 280)
+    sunBloom.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
+    sunBloom.addColorStop(0.35, 'rgba(255, 246, 220, 0.5)')
+    sunBloom.addColorStop(1, 'rgba(255, 246, 220, 0)')
+    ctx.fillStyle = sunBloom
+    ctx.beginPath()
+    ctx.arc(280, 360, 280, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Distant soft green gallery garden trees & foliage silhouettes
+    ctx.fillStyle = '#65816c'
+    for (let x = 0; x <= 1024; x += 40) {
+      const h = 70 + Math.sin(x * 0.03) * 35 + Math.cos(x * 0.08) * 15
+      ctx.beginPath()
+      ctx.arc(x, 480 - h * 0.5, h * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.fillStyle = '#4c6653'
+    ctx.fillRect(0, 470, 1024, 42)
+
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.anisotropy = 8
+    return tex
+  }
 
   private createPlasterTexture(): THREE.CanvasTexture {
     const canvas = document.createElement('canvas')
@@ -1151,7 +1212,6 @@ export class StudioWorld {
     ctx.fillStyle = '#f7f4ec'
     ctx.fillRect(0, 0, 1024, 1024)
 
-    // Subtle Venetian plaster trowel strokes
     for (let i = 0; i < 280; i++) {
       const x = Math.random() * 1024
       const y = Math.random() * 1024
@@ -1184,16 +1244,13 @@ export class StudioWorld {
     ctx.fillStyle = '#eee7da'
     ctx.fillRect(0, 0, 1024, 1024)
 
-    // Ashlar stone block courses
     const rowH = 256
     for (let y = 0; y < 1024; y += rowH) {
-      // Horizontal mortar joint
       ctx.fillStyle = 'rgba(120, 110, 95, 0.45)'
       ctx.fillRect(0, y, 1024, 3)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
       ctx.fillRect(0, y + 3, 1024, 1.5)
 
-      // Vertical staggered joints
       const colW = 512
       const xOff = (y / rowH) % 2 === 0 ? 0 : 256
       for (let x = xOff; x < 1024; x += colW) {
@@ -1201,7 +1258,6 @@ export class StudioWorld {
         ctx.fillRect(x, y, 3, rowH)
       }
 
-      // Natural sedimentary limestone striations
       for (let py = y + 8; py < y + rowH - 8; py += 12) {
         ctx.fillStyle = `rgba(195, 185, 170, ${0.12 + Math.sin(py * 0.1) * 0.06})`
         ctx.fillRect(0, py, 1024, 4 + Math.random() * 6)
@@ -1222,27 +1278,22 @@ export class StudioWorld {
     canvas.height = 512
     const ctx = canvas.getContext('2d')!
 
-    // Dark acoustic background groove
     ctx.fillStyle = '#141210'
     ctx.fillRect(0, 0, 1024, 512)
 
-    // Vertical dark American walnut timber battens
     const slatW = 48
     const grooveW = 16
     const step = slatW + grooveW
 
     for (let x = 0; x < 1024; x += step) {
-      // Base walnut tone
       ctx.fillStyle = '#3a2a1d'
       ctx.fillRect(x, 0, slatW, 512)
 
-      // Wood grain lines
       for (let gx = x + 3; gx < x + slatW - 3; gx += 4) {
         ctx.fillStyle = 'rgba(40, 26, 16, 0.35)'
         ctx.fillRect(gx, 0, 1.5, 512)
       }
 
-      // Slat edge highlight and shadow bevel
       ctx.fillStyle = 'rgba(255, 235, 210, 0.18)'
       ctx.fillRect(x, 0, 1.5, 512)
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
@@ -1257,23 +1308,53 @@ export class StudioWorld {
     return tex
   }
 
+  private createWoodSlatNormal(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')!
+
+    // Flat normal color (128, 128, 255)
+    ctx.fillStyle = '#8080ff'
+    ctx.fillRect(0, 0, 1024, 512)
+
+    const slatW = 48
+    const grooveW = 16
+    const step = slatW + grooveW
+
+    for (let x = 0; x < 1024; x += step) {
+      // Left bevel edge (facing left: lower red, ~95, 128, 240)
+      ctx.fillStyle = '#5f80f0'
+      ctx.fillRect(x, 0, 3, 512)
+      // Right bevel edge (facing right: higher red, ~160, 128, 240)
+      ctx.fillStyle = '#a080f0'
+      ctx.fillRect(x + slatW - 3, 0, 3, 512)
+      // Deep groove
+      ctx.fillStyle = '#8080c8'
+      ctx.fillRect(x + slatW, 0, grooveW, 512)
+    }
+
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    tex.repeat.set(3, 1)
+    tex.anisotropy = 8
+    return tex
+  }
+
   private createCardboardTexture(): THREE.CanvasTexture {
     const canvas = document.createElement('canvas')
     canvas.width = 512
     canvas.height = 512
     const ctx = canvas.getContext('2d')!
 
-    // Kraft paper brown
     ctx.fillStyle = '#c7a274'
     ctx.fillRect(0, 0, 512, 512)
 
-    // Corrugated horizontal fluting lines
     ctx.fillStyle = 'rgba(120, 85, 45, 0.08)'
     for (let y = 0; y < 512; y += 4) {
       ctx.fillRect(0, y, 512, 1.5)
     }
 
-    // White courier delivery label with barcode
     ctx.fillStyle = '#f8f8f8'
     ctx.fillRect(40, 60, 240, 160)
     ctx.strokeStyle = '#222'
@@ -1286,12 +1367,10 @@ export class StudioWorld {
     ctx.fillText('TWO EYES FINE ART ARCHIVE', 55, 110)
     ctx.fillText('DEST: GALLERY LEVEL 1', 55, 126)
 
-    // Barcode lines
     for (let bx = 55; bx < 250; bx += Math.floor(Math.random() * 5) + 3) {
       ctx.fillRect(bx, 142, Math.random() > 0.5 ? 2.5 : 1.2, 55)
     }
 
-    // Red "FRAGILE / THIS SIDE UP" sticker
     ctx.fillStyle = '#b91c1c'
     ctx.fillRect(320, 70, 150, 140)
     ctx.fillStyle = '#ffffff'
@@ -1315,11 +1394,9 @@ export class StudioWorld {
     canvas.height = 512
     const ctx = canvas.getContext('2d')!
 
-    // Light pine timber
     ctx.fillStyle = '#cfb997'
     ctx.fillRect(0, 0, 512, 512)
 
-    // Horizontal plank slats
     const plankH = 102
     for (let y = 0; y < 512; y += plankH) {
       ctx.fillStyle = 'rgba(70, 50, 30, 0.4)'
@@ -1327,14 +1404,12 @@ export class StudioWorld {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.22)'
       ctx.fillRect(0, y + 3, 512, 1.5)
 
-      // Wood grain
       for (let py = y + 4; py < y + plankH - 4; py += 5) {
         ctx.fillStyle = 'rgba(110, 85, 55, 0.08)'
         ctx.fillRect(0, py, 512, 1.5)
       }
     }
 
-    // Black stencilled markings
     ctx.fillStyle = 'rgba(20, 20, 20, 0.75)'
     ctx.font = 'bold 28px sans-serif'
     ctx.fillText('TWO EYES · ARCHIVE', 45, 180)
@@ -1354,17 +1429,14 @@ export class StudioWorld {
     canvas.height = 512
     const ctx = canvas.getContext('2d')!
 
-    // Polished cherry wood palette
     ctx.fillStyle = '#7a4b2c'
     ctx.fillRect(0, 0, 512, 512)
 
-    // Wood grain
     for (let y = 0; y < 512; y += 4) {
       ctx.fillStyle = 'rgba(60, 30, 15, 0.15)'
       ctx.fillRect(0, y, 512, 1.5)
     }
 
-    // Authentic paint dollops arranged around the perimeter
     const swatches = [
       { color: '#1d4ed8', x: 80, y: 80, r: 24 },
       { color: '#0d9488', x: 160, y: 70, r: 22 },
@@ -1382,7 +1454,6 @@ export class StudioWorld {
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
       ctx.fillStyle = s.color
       ctx.fill()
-      // Glossy specular highlight on wet paint dollop
       ctx.beginPath()
       ctx.arc(s.x - 5, s.y - 6, s.r * 0.35, 0, Math.PI * 2)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
@@ -1400,29 +1471,25 @@ export class StudioWorld {
     canvas.height = 640
     const ctx = canvas.getContext('2d')!
 
-    // Classical artist value study on toned linen ground
     ctx.fillStyle = '#6b7280'
     ctx.fillRect(0, 0, 512, 640)
 
-    // Classical plaster sphere showing core shadow, cast shadow, and highlight
     const sphereGrad = ctx.createRadialGradient(200, 240, 20, 256, 300, 160)
-    sphereGrad.addColorStop(0, '#ffffff') // Specular highlight
-    sphereGrad.addColorStop(0.35, '#cbd5e1') // Halftone
-    sphereGrad.addColorStop(0.75, '#334155') // Core shadow
-    sphereGrad.addColorStop(0.92, '#64748b') // Reflected light
-    sphereGrad.addColorStop(1, '#0f172a') // Occlusion
+    sphereGrad.addColorStop(0, '#ffffff')
+    sphereGrad.addColorStop(0.35, '#cbd5e1')
+    sphereGrad.addColorStop(0.75, '#334155')
+    sphereGrad.addColorStop(0.92, '#64748b')
+    sphereGrad.addColorStop(1, '#0f172a')
     ctx.beginPath()
     ctx.arc(256, 300, 140, 0, Math.PI * 2)
     ctx.fillStyle = sphereGrad
     ctx.fill()
 
-    // Cast shadow on pedestal
     ctx.beginPath()
     ctx.ellipse(320, 440, 140, 36, 0, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(15, 23, 42, 0.65)'
     ctx.fill()
 
-    // 5-Step Value Ramp Comparator along bottom
     const ramp = ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc']
     for (let i = 0; i < 5; i++) {
       ctx.fillStyle = ramp[i]
@@ -1445,11 +1512,9 @@ export class StudioWorld {
     ctx.fillStyle = '#' + colorHex.toString(16).padStart(6, '0')
     ctx.fillRect(0, 0, 512, 256)
 
-    // Book spine crease
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'
     ctx.fillRect(110, 0, 8, 256)
 
-    // Embossed gold foil title on front cover
     ctx.fillStyle = '#f5d77f'
     ctx.font = 'bold 24px Georgia, serif'
     ctx.fillText(title, 145, 95)
@@ -1469,16 +1534,13 @@ export class StudioWorld {
     canvas.height = 160
     const ctx = canvas.getContext('2d')!
 
-    // Polished museum brass plate
     ctx.fillStyle = '#d4af37'
     ctx.fillRect(0, 0, 512, 160)
 
-    // Outer engraved border
     ctx.strokeStyle = '#5a4510'
     ctx.lineWidth = 3
     ctx.strokeRect(8, 8, 496, 144)
 
-    // Museum typography
     ctx.fillStyle = '#1c1708'
     ctx.font = 'bold 24px Georgia, serif'
     ctx.textAlign = 'center'
@@ -1496,7 +1558,6 @@ export class StudioWorld {
     return tex
   }
 
-  /** Generates high-resolution museum fine-art oil painting masterpieces for the gallery wall */
   private createArtworkTexture(type: 'monochromatic' | 'analogous' | 'complementary' | 'split-complementary'): THREE.CanvasTexture {
     const canvas = document.createElement('canvas')
     canvas.width = 1024
@@ -1504,8 +1565,6 @@ export class StudioWorld {
     const ctx = canvas.getContext('2d')!
 
     if (type === 'monochromatic') {
-      // ▮ 0° Monochromatic: "Nocturne in Ultramarine"
-      // Moonlit ocean sea storm painted in rich Cobalt Blue, Prussian Blue, and Ice Tints
       const bg = ctx.createLinearGradient(0, 0, 0, 1280)
       bg.addColorStop(0, '#04091a')
       bg.addColorStop(0.35, '#0c1b3f')
@@ -1515,7 +1574,6 @@ export class StudioWorld {
       ctx.fillStyle = bg
       ctx.fillRect(0, 0, 1024, 1280)
 
-      // Dramatic moonlit sea storm clouds
       for (let i = 0; i < 18; i++) {
         const cx = 100 + Math.random() * 824
         const cy = 80 + Math.random() * 380
@@ -1530,7 +1588,6 @@ export class StudioWorld {
         ctx.fill()
       }
 
-      // Luminous full moon with atmospheric halo
       const moonGrad = ctx.createRadialGradient(512, 280, 20, 512, 280, 260)
       moonGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
       moonGrad.addColorStop(0.18, 'rgba(224, 242, 254, 0.95)')
@@ -1541,7 +1598,6 @@ export class StudioWorld {
       ctx.arc(512, 280, 260, 0, Math.PI * 2)
       ctx.fill()
 
-      // Ocean horizon & breaking swells
       const horizonY = 620
       const seaGrad = ctx.createLinearGradient(0, horizonY, 0, 1280)
       seaGrad.addColorStop(0, '#0c1d4a')
@@ -1550,14 +1606,12 @@ export class StudioWorld {
       ctx.fillStyle = seaGrad
       ctx.fillRect(0, horizonY, 1024, 660)
 
-      // Shimmering moonbeam light path reflecting down the ocean waves
       for (let y = horizonY; y < 1280; y += 8) {
         const spread = ((y - horizonY) / 660) * 280 + 35
         ctx.fillStyle = `rgba(224, 242, 254, ${0.45 - (y - horizonY) * 0.00035})`
         ctx.fillRect(512 - spread / 2 + Math.sin(y * 0.1) * 15, y, spread, 4)
       }
 
-      // Rhythmic crashing ocean wave crests & white sea spray
       const waves = [690, 780, 890, 1020, 1160]
       for (let i = 0; i < waves.length; i++) {
         const wy = waves[i]
@@ -1572,7 +1626,6 @@ export class StudioWorld {
         ctx.fillStyle = `rgba(15, 30, 75, ${0.7 + i * 0.06})`
         ctx.fill()
 
-        // White foam edge
         ctx.beginPath()
         ctx.moveTo(0, wy)
         for (let x = 0; x <= 1024; x += 40) {
@@ -1583,8 +1636,6 @@ export class StudioWorld {
         ctx.stroke()
       }
     } else if (type === 'analogous') {
-      // ≋ 30° Analogous: "Nordic Fjord & Pine Mist"
-      // Luminous landscape transition from Deep Emerald Pine (150°) to Teal Water (180°) and Cerulean Alpine Sky (210°)
       const bg = ctx.createLinearGradient(0, 0, 0, 1280)
       bg.addColorStop(0, '#0284c7')
       bg.addColorStop(0.3, '#0d9488')
@@ -1594,7 +1645,6 @@ export class StudioWorld {
       ctx.fillStyle = bg
       ctx.fillRect(0, 0, 1024, 1280)
 
-      // Layered mountain ridge silhouettes in teal/cerulean haze
       const ridges = [
         { y: 380, color: '#0f766e', amp: 90 },
         { y: 520, color: '#115e59', amp: 110 },
@@ -1613,7 +1663,6 @@ export class StudioWorld {
         ctx.fill()
       }
 
-      // Crystalline turquoise glacial fjord water
       const lakeY = 740
       const lakeGrad = ctx.createLinearGradient(0, lakeY, 0, 1280)
       lakeGrad.addColorStop(0, '#0d9488')
@@ -1623,7 +1672,6 @@ export class StudioWorld {
       ctx.fillStyle = lakeGrad
       ctx.fillRect(0, lakeY, 1024, 540)
 
-      // Emerald pine tree silhouettes in foreground
       for (let tx = 0; tx < 1024; tx += 48) {
         const th = 180 + Math.sin(tx * 0.05) * 60 + Math.random() * 40
         ctx.fillStyle = '#022c22'
@@ -1635,8 +1683,6 @@ export class StudioWorld {
         ctx.fill()
       }
     } else if (type === 'complementary') {
-      // ↔ 180° Complementary: "Sunset Over Solstice Waters"
-      // Turner-style fiery Molten Vermilion/Amber Sunset (30°) vs Deep Cobalt Navy Waters (210°)
       const bg = ctx.createLinearGradient(0, 0, 0, 680)
       bg.addColorStop(0, '#7c2d12')
       bg.addColorStop(0.25, '#c2410c')
@@ -1647,7 +1693,6 @@ export class StudioWorld {
       ctx.fillStyle = bg
       ctx.fillRect(0, 0, 1024, 680)
 
-      // Radiant setting sun on the horizon
       const sunGrad = ctx.createRadialGradient(512, 670, 20, 512, 670, 280)
       sunGrad.addColorStop(0, '#ffffff')
       sunGrad.addColorStop(0.25, '#fef08a')
@@ -1658,7 +1703,6 @@ export class StudioWorld {
       ctx.arc(512, 670, 280, 0, Math.PI, true)
       ctx.fill()
 
-      // Deep polar opposite Cobalt Navy / Indigo ocean water
       const seaY = 675
       const seaGrad = ctx.createLinearGradient(0, seaY, 0, 1280)
       seaGrad.addColorStop(0, '#172554')
@@ -1668,30 +1712,23 @@ export class StudioWorld {
       ctx.fillStyle = seaGrad
       ctx.fillRect(0, seaY, 1024, 605)
 
-      // Shimmering molten gold path of sunlight reflected across indigo swells
       for (let y = seaY; y < 1280; y += 6) {
         const spread = ((y - seaY) / 605) * 360 + 50
         ctx.fillStyle = `rgba(251, 191, 36, ${0.75 - (y - seaY) * 0.0006})`
         ctx.fillRect(512 - spread / 2 + Math.sin(y * 0.08) * 20, y, spread, 3)
       }
     } else {
-      // ▲ 150°/210° Split-Complementary: "Harmonic Equilibrium"
-      // Museum-grade modernist architectural composition (Cobalt Blue vs Saffron Ochre & Terracotta)
       ctx.fillStyle = '#0f172a'
       ctx.fillRect(0, 0, 1024, 1280)
 
-      // Textured raw canvas ground
       ctx.fillStyle = '#1e293b'
       ctx.fillRect(60, 60, 904, 1160)
 
-      // Dynamic Bauhaus geometric cantilevered shapes
-      // 1. Saffron Ochre semi-arch
       ctx.fillStyle = '#eab308'
       ctx.beginPath()
       ctx.arc(512, 460, 320, 0, Math.PI)
       ctx.fill()
 
-      // 2. Cobalt Blue bold angled polygon
       ctx.fillStyle = '#1d4ed8'
       ctx.beginPath()
       ctx.moveTo(180, 720)
@@ -1700,13 +1737,11 @@ export class StudioWorld {
       ctx.closePath()
       ctx.fill()
 
-      // 3. Terracotta Coral architectural block
       ctx.fillStyle = '#ea580c'
       ctx.beginPath()
       ctx.rect(260, 310, 190, 530)
       ctx.fill()
 
-      // 4. Gilded gold foil circle accent
       ctx.beginPath()
       ctx.arc(512, 530, 95, 0, Math.PI * 2)
       ctx.strokeStyle = '#f8fafc'
@@ -1714,7 +1749,6 @@ export class StudioWorld {
       ctx.stroke()
     }
 
-    // Fine Belgian linen fabric weave texture overlay
     ctx.fillStyle = 'rgba(255, 255, 255, 0.028)'
     for (let y = 0; y < 1280; y += 3) ctx.fillRect(0, y, 1024, 1)
     for (let x = 0; x < 1024; x += 3) ctx.fillRect(x, 0, 1, 1280)
@@ -1750,37 +1784,32 @@ export class StudioWorld {
     return motes
   }
 
-  private floorMaterial(): THREE.MeshStandardMaterial {
+  private floorMaterial(): THREE.MeshPhysicalMaterial {
     const canvas = document.createElement('canvas')
     canvas.width = 2048
     canvas.height = 1024
     const ctx = canvas.getContext('2d')!
 
-    // Base warm French White Oak tone
     ctx.fillStyle = '#e2d5bd'
     ctx.fillRect(0, 0, 2048, 1024)
 
     const plankHeight = 128
     for (let y = 0; y < 1024; y += plankHeight) {
-      // Subtle tonal variation between different planks
       const plankTone = ((y / plankHeight) % 4) * 5 - 8
       ctx.fillStyle = `rgba(${226 + plankTone}, ${213 + plankTone}, ${189 + plankTone}, 0.38)`
       ctx.fillRect(0, y, 2048, plankHeight)
 
-      // Beveled plank seam shadow and highlight
       ctx.fillStyle = 'rgba(75, 55, 35, 0.45)'
       ctx.fillRect(0, y, 2048, 3)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
       ctx.fillRect(0, y + 3, 2048, 1.5)
 
-      // Staggered vertical plank end joints
       const xOffset = ((y / plankHeight) % 3) * 680 + 340
       for (let x = xOffset; x < 2048; x += 1024) {
         ctx.fillStyle = 'rgba(75, 55, 35, 0.45)'
         ctx.fillRect(x % 2048, y, 3, plankHeight)
       }
 
-      // Fine organic wood grain fibers & growth rings
       for (let py = y + 4; py < y + plankHeight - 4; py += 3) {
         ctx.beginPath()
         ctx.strokeStyle = `rgba(130, 105, 78, ${0.08 + Math.sin(py * 0.15) * 0.04})`
@@ -1792,7 +1821,6 @@ export class StudioWorld {
         ctx.stroke()
       }
 
-      // Organic wood knots
       if ((y / plankHeight) % 2 === 0) {
         const kx = ((y * 7) % 1800) + 120
         const ky = y + plankHeight / 2
@@ -1810,11 +1838,14 @@ export class StudioWorld {
     texture.anisotropy = 8
     texture.generateMipmaps = true
 
-    return new THREE.MeshStandardMaterial({
+    // Architectural French Oak with subtle polyurethane clearcoat & satin specular reflections
+    return new THREE.MeshPhysicalMaterial({
       map: texture,
       color: 0xfbf6ee,
       roughness: 0.32,
       metalness: 0.02,
+      clearcoat: 0.18,
+      clearcoatRoughness: 0.28,
     })
   }
 
