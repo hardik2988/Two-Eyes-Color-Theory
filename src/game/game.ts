@@ -111,8 +111,8 @@ export class Game {
     } else if (this.puzzles.value.state === 'completed') {
       level = 3
       title = 'Gallery Wall Colour Harmonies'
-      targetName = 'South Gallery Wall'
-      targetPos.set(0, 0.72, 7.15)
+      targetName = 'Gallery Curator Stand'
+      targetPos.set(0, 0.72, 6.35)
     } else if (this.puzzles.paintMixing.state === 'completed') {
       level = 2
       title = 'Value & Saturation Easel'
@@ -188,6 +188,7 @@ export class Game {
   }
 
   toTitle(): void {
+    this.audio.stopMusic()
     this.mode = 'attract'
     this.perspective = 'jack'
     this.renderer.setVisionMode('jack', true)

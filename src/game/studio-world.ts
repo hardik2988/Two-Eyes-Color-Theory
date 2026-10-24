@@ -24,7 +24,9 @@ export class StudioWorld {
   readonly spawn = v3(0, 0.72, 5.8)
   readonly targets: StudioTarget[] = []
   readonly objectiveBeacon: THREE.Group
-  private beaconTargetPos = new THREE.Vector3(0, 2.2, 3.05)
+  readonly floorWaypointRing: THREE.Group
+  private beaconTargetPos = new THREE.Vector3(0, 1.45, 3.05)
+  private floorRingTargetPos = new THREE.Vector3(0, 0.02, 3.05)
   private mixingCanvasMat?: THREE.MeshStandardMaterial
   private keyLight?: THREE.DirectionalLight
   private readonly dust: THREE.Points
@@ -79,24 +81,68 @@ export class StudioWorld {
     this.dust = this.createDaylightMotes()
     this.dustPosition = this.dust.geometry.getAttribute('position') as THREE.BufferAttribute
 
-    // 3D Objective Waypoint Beacon (hovers and guides player to active installation)
+    // 3D Objective Waypoint Beacon (refined architectural gold diamond & gyro rings)
     this.objectiveBeacon = new THREE.Group()
-    const beaconRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.32, 0.032, 16, 32),
-      new THREE.MeshStandardMaterial({ color: 0xc1121f, emissive: 0x780000, roughness: 0.3, metalness: 0.5 }),
-    )
-    beaconRing.rotation.x = Math.PI / 2
-    this.objectiveBeacon.add(beaconRing)
 
     const beaconMarker = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.16),
-      new THREE.MeshStandardMaterial({ color: 0xfdf0d5, emissive: 0xc1121f, roughness: 0.2 }),
+      new THREE.OctahedronGeometry(0.18),
+      new THREE.MeshStandardMaterial({
+        color: 0xfdf0d5,
+        emissive: 0xf59e0b,
+        emissiveIntensity: 0.85,
+        roughness: 0.2,
+        metalness: 0.6,
+      }),
     )
-    beaconMarker.position.y = 0.22
+    beaconMarker.position.y = 0.14
     this.objectiveBeacon.add(beaconMarker)
+
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      emissive: 0x78350f,
+      roughness: 0.25,
+      metalness: 0.85,
+    })
+    const gyroRing1 = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.016, 12, 36), ringMat)
+    gyroRing1.rotation.x = Math.PI / 2
+    this.objectiveBeacon.add(gyroRing1)
+
+    const gyroRing2 = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 12, 36), ringMat)
+    gyroRing2.rotation.y = Math.PI / 3
+    this.objectiveBeacon.add(gyroRing2)
+
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.002, 0.24, 12), ringMat)
+    pin.position.y = -0.12
+    this.objectiveBeacon.add(pin)
 
     this.objectiveBeacon.position.copy(this.beaconTargetPos)
     this.scene.add(this.objectiveBeacon)
+
+    // Glowing Floor Projection Waypoint Ring (pulsing circular beacon decal on oak floor)
+    this.floorWaypointRing = new THREE.Group()
+    const floorOuter = new THREE.Mesh(
+      new THREE.TorusGeometry(0.85, 0.025, 8, 48),
+      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.75, side: THREE.DoubleSide }),
+    )
+    floorOuter.rotation.x = Math.PI / 2
+    this.floorWaypointRing.add(floorOuter)
+
+    const floorInner = new THREE.Mesh(
+      new THREE.TorusGeometry(0.55, 0.015, 8, 36),
+      new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.6, side: THREE.DoubleSide }),
+    )
+    floorInner.rotation.x = Math.PI / 2
+    this.floorWaypointRing.add(floorInner)
+
+    const floorDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.35, 24),
+      new THREE.MeshBasicMaterial({ color: 0xfef3c7, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+    )
+    floorDisc.rotation.x = -Math.PI / 2
+    this.floorWaypointRing.add(floorDisc)
+
+    this.floorWaypointRing.position.copy(this.floorRingTargetPos)
+    this.scene.add(this.floorWaypointRing)
 
     // Ensure all target child meshes are flagged for raycasting
     for (const target of this.targets) {
@@ -108,20 +154,30 @@ export class StudioWorld {
 
   setObjectiveStation(stationId: string): void {
     if (stationId === 'paint-mixing') {
-      this.beaconTargetPos.set(0, 2.2, 3.05)
+      this.beaconTargetPos.set(0, 1.45, 3.05)
+      this.floorRingTargetPos.set(0, 0.02, 3.05)
       this.objectiveBeacon.visible = true
+      this.floorWaypointRing.visible = true
     } else if (stationId === 'value') {
-      this.beaconTargetPos.set(-3.25, 2.8, 0.55)
+      this.beaconTargetPos.set(-3.25, 1.6, 0.55)
+      this.floorRingTargetPos.set(-3.25, 0.02, 0.55)
       this.objectiveBeacon.visible = true
+      this.floorWaypointRing.visible = true
     } else if (stationId === 'harmonies') {
-      this.beaconTargetPos.set(0, 3.8, 7.15)
+      this.beaconTargetPos.set(0, 1.4, 6.35)
+      this.floorRingTargetPos.set(0, 0.02, 6.35)
       this.objectiveBeacon.visible = true
+      this.floorWaypointRing.visible = true
     } else if (stationId === 'vault') {
-      this.beaconTargetPos.set(0, 3.2, -7.0)
+      this.beaconTargetPos.set(0, 1.65, -7.0)
+      this.floorRingTargetPos.set(0, 0.02, -7.0)
       this.objectiveBeacon.visible = true
+      this.floorWaypointRing.visible = true
     } else {
       this.objectiveBeacon.visible = false
+      this.floorWaypointRing.visible = false
     }
+    this.floorWaypointRing.position.copy(this.floorRingTargetPos)
   }
 
   setPaletteMixedColor(hex: string): void {
@@ -173,10 +229,17 @@ export class StudioWorld {
   update(time: number, delta: number): void {
     // 3D Waypoint beacon bob and spin
     if (this.objectiveBeacon.visible) {
-      this.objectiveBeacon.rotation.y += delta * 1.6
+      this.objectiveBeacon.rotation.y += delta * 1.5
       this.objectiveBeacon.position.x = this.beaconTargetPos.x
       this.objectiveBeacon.position.z = this.beaconTargetPos.z
-      this.objectiveBeacon.position.y = this.beaconTargetPos.y + Math.sin(time * 2.8) * 0.08
+      this.objectiveBeacon.position.y = this.beaconTargetPos.y + Math.sin(time * 3.0) * 0.06
+    }
+    if (this.floorWaypointRing.visible) {
+      this.floorWaypointRing.position.x = this.floorRingTargetPos.x
+      this.floorWaypointRing.position.z = this.floorRingTargetPos.z
+      this.floorWaypointRing.rotation.y += delta * 0.4
+      const pulse = 1 + Math.sin(time * 2.8) * 0.05
+      this.floorWaypointRing.scale.set(pulse, 1, pulse)
     }
 
     const positions = this.dustPosition.array as Float32Array
@@ -454,6 +517,212 @@ export class StudioWorld {
     this.physics.addStaticCylinder(v3(-3.25, 0.52, 1.95), 0.44, 0.14)
   }
 
+  /** Generates high-resolution painterly master artwork textures for the gallery wall */
+  private createArtworkTexture(type: 'monochromatic' | 'analogous' | 'complementary' | 'split-complementary'): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 640
+    const ctx = canvas.getContext('2d')!
+
+    if (type === 'monochromatic') {
+      // Monochromatic Seascape & Lunar Value Study (Single Hue: Cobalt Blue 210°)
+      const bg = ctx.createLinearGradient(0, 0, 0, 640)
+      bg.addColorStop(0, '#091024')
+      bg.addColorStop(0.42, '#1e3a8a')
+      bg.addColorStop(0.68, '#2563eb')
+      bg.addColorStop(1, '#0f172a')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, 512, 640)
+
+      // Layered atmospheric ocean wave swells in cobalt value tints & shades
+      const waveColors = ['#172554', '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd']
+      for (let i = 0; i < waveColors.length; i++) {
+        const y = 310 + i * 48
+        ctx.beginPath()
+        ctx.fillStyle = waveColors[i]
+        ctx.moveTo(0, y)
+        for (let x = 0; x <= 512; x += 16) {
+          ctx.lineTo(x, y + Math.sin(x * 0.02 + i * 0.8) * (18 - i * 2))
+        }
+        ctx.lineTo(512, 640)
+        ctx.lineTo(0, 640)
+        ctx.closePath()
+        ctx.fill()
+      }
+
+      // Moon disc at top (Pale Ice Tint)
+      ctx.beginPath()
+      ctx.arc(256, 145, 62, 0, Math.PI * 2)
+      ctx.fillStyle = '#e0f2fe'
+      ctx.shadowColor = '#93c5fd'
+      ctx.shadowBlur = 32
+      ctx.fill()
+      ctx.shadowBlur = 0
+
+      // Geometric Inscription Badge
+      ctx.fillStyle = 'rgba(255,255,255,0.88)'
+      ctx.font = 'bold 32px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('▮ 0° MONOCHROMATIC', 256, 605)
+    } else if (type === 'analogous') {
+      // Analogous Coastal Terraces (Adjacent 30° Neighbours: Blue 210° → Teal 180° → Emerald 150°)
+      const bg = ctx.createLinearGradient(0, 0, 512, 640)
+      bg.addColorStop(0, '#064e3b')
+      bg.addColorStop(0.35, '#0d9488')
+      bg.addColorStop(0.7, '#2563eb')
+      bg.addColorStop(1, '#1e3a8a')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, 512, 640)
+
+      // Rhythmic flowing coastal curves & tide contours
+      const bandColors = ['#042f2e', '#115e59', '#0d9488', '#14b8a6', '#2dd4bf', '#16a34a', '#22c55e']
+      for (let i = 0; i < bandColors.length; i++) {
+        ctx.beginPath()
+        ctx.fillStyle = bandColors[i]
+        ctx.arc(90 + i * 46, 210 + i * 38, 230 - i * 16, 0, Math.PI * 2)
+        ctx.globalAlpha = 0.62
+        ctx.fill()
+        ctx.globalAlpha = 1.0
+      }
+
+      ctx.fillStyle = 'rgba(255,255,255,0.88)'
+      ctx.font = 'bold 32px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('≋ 30° ANALOGOUS', 256, 605)
+    } else if (type === 'complementary') {
+      // Complementary Polar Sunset (180° Opposites: Cobalt Blue 210° vs Amber Orange 30°)
+      const bg = ctx.createLinearGradient(0, 0, 0, 640)
+      bg.addColorStop(0, '#7c2d12')
+      bg.addColorStop(0.35, '#ea580c')
+      bg.addColorStop(0.5, '#f59e0b')
+      bg.addColorStop(0.51, '#172554')
+      bg.addColorStop(0.75, '#1e3a8a')
+      bg.addColorStop(1, '#0f172a')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, 512, 640)
+
+      // Radiant setting sun on the horizon
+      ctx.beginPath()
+      ctx.arc(256, 320, 82, 0, Math.PI, true)
+      ctx.fillStyle = '#fef08a'
+      ctx.shadowColor = '#ea580c'
+      ctx.shadowBlur = 42
+      ctx.fill()
+      ctx.shadowBlur = 0
+
+      // Orange specular reflections in deep cobalt water
+      ctx.fillStyle = 'rgba(249, 115, 22, 0.45)'
+      ctx.beginPath()
+      ctx.moveTo(256, 325)
+      ctx.lineTo(345, 560)
+      ctx.lineTo(168, 560)
+      ctx.closePath()
+      ctx.fill()
+
+      ctx.fillStyle = 'rgba(255,255,255,0.88)'
+      ctx.font = 'bold 32px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('↔ 180° COMPLEMENTARY', 256, 605)
+    } else {
+      // Split-Complementary Constructivism (Base Blue 210° vs Saffron Gold 60° & Coral 0°)
+      ctx.fillStyle = '#0f172a'
+      ctx.fillRect(0, 0, 512, 640)
+
+      // Dynamic Bauhaus geometric cantilevered shapes
+      ctx.fillStyle = '#1d4ed8'
+      ctx.beginPath()
+      ctx.arc(256, 230, 165, 0, Math.PI)
+      ctx.fill()
+
+      ctx.fillStyle = '#eab308'
+      ctx.beginPath()
+      ctx.moveTo(95, 360)
+      ctx.lineTo(440, 175)
+      ctx.lineTo(395, 480)
+      ctx.closePath()
+      ctx.fill()
+
+      ctx.fillStyle = '#ea580c'
+      ctx.beginPath()
+      ctx.rect(135, 155, 95, 265)
+      ctx.fill()
+
+      // Central white balance ring
+      ctx.beginPath()
+      ctx.arc(256, 265, 48, 0, Math.PI * 2)
+      ctx.strokeStyle = '#f8fafc'
+      ctx.lineWidth = 14
+      ctx.stroke()
+
+      ctx.fillStyle = 'rgba(255,255,255,0.88)'
+      ctx.font = 'bold 30px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('▲ 150°/210° SPLIT-COMP', 256, 605)
+    }
+
+    // Canvas fine linen texture overlay
+    ctx.fillStyle = 'rgba(255,255,255,0.035)'
+    for (let y = 0; y < 640; y += 4) ctx.fillRect(0, y, 512, 1)
+    for (let x = 0; x < 512; x += 4) ctx.fillRect(x, 0, 1, 640)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    return texture
+  }
+
+  /** Mounts an individual framed master painting on the gallery wall facing the room */
+  private addGalleryPainting(
+    parent: THREE.Group,
+    x: number,
+    y: number,
+    z: number,
+    type: 'monochromatic' | 'analogous' | 'complementary' | 'split-complementary',
+    _title: string,
+    target: StudioTarget,
+  ): void {
+    const p = new THREE.Group()
+    p.position.set(x, y, z)
+    // Rotate 180 degrees so front face of canvas faces INTO the room (-Z)
+    p.rotation.y = Math.PI
+    parent.add(p)
+
+    const w = 1.35
+    const h = 1.75
+    const frameDepth = 0.08
+
+    // 1. Outer Dark Walnut Moulding Frame
+    this.mesh(p, new THREE.BoxGeometry(w + 0.16, h + 0.16, frameDepth), this.mats.darkWood, [0, 0, -frameDepth / 2])
+
+    // 2. Inner Champagne Bronze Bevel Slip
+    this.mesh(p, new THREE.BoxGeometry(w + 0.04, h + 0.04, frameDepth + 0.01), this.mats.champagneBronze, [0, 0, -frameDepth / 2])
+
+    // 3. Off-White Museum Cotton Mat Border
+    this.mesh(p, new THREE.BoxGeometry(w, h, 0.01), this.mats.canvas, [0, 0, 0.005])
+
+    // 4. Fine Art Canvas with CanvasTexture
+    const artTexture = this.createArtworkTexture(type)
+    const artMat = new THREE.MeshStandardMaterial({ map: artTexture, roughness: 0.8, metalness: 0.02 })
+    this.mesh(p, new THREE.BoxGeometry(w - 0.18, h - 0.22, 0.015), artMat, [0, 0, 0.012])
+
+    // 5. Museum Brass Placard Underneath
+    this.mesh(p, new THREE.BoxGeometry(0.55, 0.15, 0.02), this.mats.brass, [0, -h / 2 - 0.16, 0])
+
+    // 6. Brass Picture Light Sconce Arching Overhead
+    const sconceArm = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.35, 12), this.mats.brass)
+    sconceArm.rotation.x = Math.PI / 3
+    sconceArm.position.set(0, h / 2 + 0.14, 0.16)
+    p.add(sconceArm)
+    const sconceHead = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.44, 16), this.mats.brass)
+    sconceHead.rotation.z = Math.PI / 2
+    sconceHead.position.set(0, h / 2 + 0.26, 0.28)
+    p.add(sconceHead)
+
+    // Tag every child mesh for interaction raycasting
+    p.traverse(child => {
+      child.userData.interaction = target
+    })
+  }
+
   /** Installation 03: Curator Harmony Wall Paintings on South Wall */
   private addHarmonyGalleryWall(): void {
     const object = new THREE.Group()
@@ -471,32 +740,110 @@ export class StudioWorld {
     object.userData.interaction = target
     this.targets.push(target)
 
-    // Curator Plaque above the gallery wall
-    this.box('Curator Plaque', v3(2.4, 0.35, 0.06), v3(0, 4.4, 7.32), this.mats.brass, false)
+    // ─── 1. Centerpiece Interactive Curator Podium at X=0, Z=6.35 ─────────
+    const podium = new THREE.Group()
+    podium.position.set(0, 0, -0.85) // World Z = 7.2 - 0.85 = 6.35 (in front of South Wall)
+    object.add(podium)
 
-    // 4 Distinct framed paintings with color harmonies
-    const xOffsets = [-4.8, -1.6, 1.6, 4.8]
-    const harmonies = [
-      { name: 'Painting 1 (Comp)', colors: [0x1e40af, 0xf97316, 0x334155] },
-      { name: 'Painting 2 (Mono)', colors: [0x93c5fd, 0x2563eb, 0x1e293b] },
-      { name: 'Painting 3 (Split)', colors: [0x1d4ed8, 0xeab308, 0xea580c] },
-      { name: 'Painting 4 (Ana)', colors: [0x2563eb, 0x0d9488, 0x16a34a] },
+    // Travertine Plinth Base
+    this.mesh(podium, new THREE.BoxGeometry(1.4, 0.94, 0.75), this.mats.travertine, [0, 0.47, 0])
+    // Polished Brass Trim Bands
+    this.mesh(podium, new THREE.BoxGeometry(1.44, 0.05, 0.79), this.mats.brass, [0, 0.025, 0])
+    this.mesh(podium, new THREE.BoxGeometry(1.44, 0.06, 0.79), this.mats.brass, [0, 0.94, 0])
+
+    // Angled Museum Curator Lectern
+    const lectern = new THREE.Group()
+    lectern.position.set(0, 0.97, -0.05)
+    lectern.rotation.x = -Math.PI / 6 // Angled toward approaching player
+    podium.add(lectern)
+
+    // Gilded Catalogue Book / Tablet Display
+    this.mesh(lectern, new THREE.BoxGeometry(1.05, 0.03, 0.55), this.mats.darkWood, [0, 0, 0])
+    this.mesh(lectern, new THREE.BoxGeometry(0.96, 0.02, 0.48), this.mats.brass, [0, 0.02, 0])
+
+    // Interactive Brass Wheel Diagram on Lectern
+    const wheelStand = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.02, 24), this.mats.brass)
+    wheelStand.position.set(0, 0.04, 0)
+    lectern.add(wheelStand)
+
+    // Dedicated Task Downlight onto the Lectern
+    const taskLight = new THREE.SpotLight(0xffeedd, 9, 5, Math.PI / 4, 0.5)
+    taskLight.position.set(0, 3.8, 6.1)
+    taskLight.target = podium
+    this.scene.add(taskLight)
+    this.scene.add(taskLight.target)
+
+    // Solid Rapier physics collider for the podium so player cannot walk through it
+    this.physics.addStaticBox(v3(0, 0.47, 6.35), v3(1.4, 0.94, 0.75))
+
+    podium.traverse(child => {
+      child.userData.interaction = target
+    })
+
+    // ─── 2. Center Architectural Gallery Plaque & Relief at X=0 ──────────
+    const centerPanel = new THREE.Group()
+    centerPanel.position.set(0, 0, 0.05)
+    object.add(centerPanel)
+
+    // Sleek Walnut & Brass Backing Board for the Center Plaque
+    this.mesh(centerPanel, new THREE.BoxGeometry(1.6, 1.6, 0.04), this.mats.darkWood, [0, 2.05, 0])
+    this.mesh(centerPanel, new THREE.BoxGeometry(1.5, 1.5, 0.05), this.mats.champagneBronze, [0, 2.05, 0.005])
+
+    // Central Colour Wheel Brass Relief Disc
+    const wheelRelief = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 32), this.mats.brass)
+    wheelRelief.rotation.x = Math.PI / 2
+    wheelRelief.position.set(0, 2.45, 0.02)
+    centerPanel.add(wheelRelief)
+
+    // Curator Plaque with Title
+    this.mesh(centerPanel, new THREE.BoxGeometry(1.3, 0.24, 0.02), this.mats.brass, [0, 1.85, 0.02])
+
+    // Upper Gallery Archival Plaque
+    this.mesh(centerPanel, new THREE.BoxGeometry(2.4, 0.26, 0.04), this.mats.brass, [0, 3.55, 0.02])
+
+    centerPanel.traverse(child => {
+      child.userData.interaction = target
+    })
+
+    // ─── 3. The 4 Framed Master Paintings Facing into the Room ───────────
+    const xOffsets = [-4.5, -1.5, 1.5, 4.5]
+    const harmoniesConfig: Array<{ type: 'monochromatic' | 'analogous' | 'complementary' | 'split-complementary'; title: string }> = [
+      { type: 'monochromatic', title: 'Solitude in Cobalt (▮ Mono)' },
+      { type: 'analogous', title: 'Verdant Coastline (≋ Analogous)' },
+      { type: 'complementary', title: 'Horizon Clash (↔ Comp)' },
+      { type: 'split-complementary', title: 'Equilibrium (▲ Split-Comp)' },
     ]
 
     for (let i = 0; i < 4; i++) {
-      const p = new THREE.Group()
-      p.position.set(xOffsets[i], 2.6, 0.05)
-      object.add(p)
-      this.addPaintingToGroup(p, v3(0, 0, 0), 1.5, 1.9, harmonies[i].colors)
+      const cfg = harmoniesConfig[i]
+      this.addGalleryPainting(object, xOffsets[i], 2.65, 0.05, cfg.type, cfg.title, target)
 
-      // Individual painting spotlight
+      // Individual warm painting spotlight
       const spot = new THREE.SpotLight(0xffeedd, 12, 7, Math.PI / 5, 0.4)
       spot.position.set(xOffsets[i], 5.1, 5.2)
-      spot.target = p
       this.scene.add(spot)
-      this.scene.add(spot.target)
+      const spotTarget = new THREE.Object3D()
+      spotTarget.position.set(xOffsets[i], 2.65, 7.2)
+      this.scene.add(spotTarget)
+      spot.target = spotTarget
+    }
 
-      for (const child of p.children) child.userData.interaction = target
+    // ─── 4. Architectural Museum Viewing Bench (Gallery East Alcove) ──────
+    const bench = new THREE.Group()
+    bench.position.set(3.4, 0, 4.8)
+    this.scene.add(bench)
+    this.mesh(bench, new THREE.BoxGeometry(2.4, 0.08, 0.7), this.mats.darkWood, [0, 0.46, 0])
+    for (const bx of [-1.0, 1.0]) {
+      for (const bz of [-0.25, 0.25]) {
+        this.mesh(bench, new THREE.CylinderGeometry(0.035, 0.035, 0.44, 16), this.mats.brass, [bx, 0.22, bz])
+      }
+    }
+    this.physics.addStaticBox(v3(3.4, 0.25, 4.8), v3(2.4, 0.5, 0.7))
+
+    // ─── 5. Suspended Architectural Lighting Track ────────────────────────
+    this.box('Gallery light track', v3(11.2, 0.06, 0.06), v3(0, 5.1, 5.2), this.mats.trim, false)
+    for (const tx of [-4.5, -1.5, 0, 1.5, 4.5]) {
+      this.mesh(object, new THREE.CylinderGeometry(0.045, 0.045, 0.16, 16), this.mats.brass, [tx, 5.0, 5.2 - 7.2])
     }
   }
 

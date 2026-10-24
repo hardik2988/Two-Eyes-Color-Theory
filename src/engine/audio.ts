@@ -107,6 +107,11 @@ export class Audio {
   startMusic(): void {
     if (this.musicOn) return
     this.musicOn = true
+    if (this.ctx.state === 'running') {
+      const t = this.ctx.currentTime
+      this.music.gain.cancelScheduledValues(t)
+      this.music.gain.setTargetAtTime(0.55, t, 0.1)
+    }
     const chords = [[220, 277.2, 329.6], [196, 246.9, 293.7], [174.6, 220, 261.6], [196, 261.6, 329.6]]
     let bar = 0
     const schedule = () => {
@@ -137,5 +142,10 @@ export class Audio {
   stopMusic(): void {
     this.musicOn = false
     clearTimeout(this.musicTimer)
+    if (this.ctx.state === 'running') {
+      const t = this.ctx.currentTime
+      this.music.gain.cancelScheduledValues(t)
+      this.music.gain.setTargetAtTime(0, t, 0.05)
+    }
   }
 }

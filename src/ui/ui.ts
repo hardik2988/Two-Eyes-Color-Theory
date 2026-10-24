@@ -517,6 +517,7 @@ export class Ui {
     if (tab) {
       const value = tab.dataset.siteTab
       if (!value) return
+      if (value !== 'play') this.audio.stopMusic()
       this.root.dataset.siteTab = value
       for (const button of this.qa<HTMLButtonElement>('[data-site-tab]')) {
         button.setAttribute('aria-current', String(button === tab))

@@ -58,6 +58,7 @@ async function boot(): Promise<void> {
     restart: () => startRun(false),
     resume,
     quit: () => {
+      audio.stopMusic()
       game?.toTitle()
       input.setGameActive(false)
       ui.show('title')
