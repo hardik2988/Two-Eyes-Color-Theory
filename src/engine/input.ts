@@ -91,6 +91,9 @@ export class Input {
         dy = e.clientY - lastY
         lastX = e.clientX
         lastY = e.clientY
+      } else if (e.movementX !== 0 || e.movementY !== 0) {
+        dx = e.movementX
+        dy = e.movementY
       } else {
         return
       }

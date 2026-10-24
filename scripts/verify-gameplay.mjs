@@ -52,6 +52,7 @@ async function run() {
   const beforeYaw = await page.evaluate(() => window.__game.game.player.yaw)
   await page.evaluate(() => {
     window.dispatchEvent(new MouseEvent('mousemove', { movementX: 120, movementY: 0, bubbles: true }))
+    window.__game.game.render(0, 1 / 60)
   })
   await page.waitForTimeout(60)
   const afterYaw = await page.evaluate(() => window.__game.game.player.yaw)

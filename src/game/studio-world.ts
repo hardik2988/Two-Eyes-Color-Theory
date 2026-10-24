@@ -58,9 +58,8 @@ export class StudioWorld {
   }
 
   constructor(readonly physics: Physics, renderer: Renderer) {
-    // Warm natural daylight gallery background
+    // Warm natural daylight gallery background (fog removed to prevent washed-out floor tinting)
     this.scene.background = new THREE.Color(0xf2ece2)
-    this.scene.fog = new THREE.Fog(0xf1ebe0, 24, 52)
 
     // 1. Initial PMREM RoomEnvironment for immediate synchronous display
     const room = new RoomEnvironment()
@@ -70,16 +69,16 @@ export class StudioWorld {
     this.scene.environmentIntensity = 0.52
     pmrem.dispose()
 
-    // 2. Asynchronously load 1K studio HDR environment from public/environments/
+    // 2. Asynchronously load 2K studio HDR environment from public/environments/
     if (typeof window !== 'undefined') {
       import('three/examples/jsm/loaders/RGBELoader.js')
         .then(({ RGBELoader }) => {
           new RGBELoader().load(
-            '/environments/studio_small_08_1k.hdr',
+            '/environments/studio_small_08_2k.hdr',
             hdrTexture => {
               hdrTexture.mapping = THREE.EquirectangularReflectionMapping
               this.scene.environment = hdrTexture
-              this.scene.environmentIntensity = 0.48
+              this.scene.environmentIntensity = 0.52
             },
             undefined,
             () => {},
@@ -93,6 +92,7 @@ export class StudioWorld {
     this.buildRoom()
     this.buildFurniture()
     this.buildStudioProps()
+    this.loadGltfAssets()
 
     this.dust = this.createDaylightMotes()
     this.dustPosition = this.dust.geometry.getAttribute('position') as THREE.BufferAttribute
@@ -449,6 +449,10 @@ export class StudioWorld {
     this.addFiddleLeafPlant(7.2, -5.6)
     this.addArchitecturalBench(0, -1.8)
     this.addStool(-1.9, -0.45)
+
+    // Structural Architectural Columns with Classical Skirting & Chamfered Moulding
+    this.addStructuralPillar(-4.5, 1.5)
+    this.addStructuralPillar(4.5, 1.5)
   }
 
   /** Populates the studio with realistic artist props, wooden crates, cardboard boxes, and supplies */
@@ -566,44 +570,89 @@ export class StudioWorld {
     this.targets.push(target)
 
     // The 4 Cans: Ultramarine Blue, Cadmium Lemon, Alizarin Crimson, Titanium White
+    // Real metal paint tins with rolled rims, recessed lid chime, glossy liquid paint, and wire bail handles
     const canColors = [0x1d4ed8, 0xeab308, 0xb91c1c, 0xf8fafc]
+    const tinMat = new THREE.MeshStandardMaterial({
+      color: 0xd6dbdf,
+      roughness: 0.22,
+      metalness: 0.88,
+    })
+    const bailMat = new THREE.MeshStandardMaterial({
+      color: 0x8a929a,
+      roughness: 0.32,
+      metalness: 0.92,
+    })
+
     for (let i = 0; i < 4; i++) {
       const cx = -1.15 + i * 0.76
       const can = new THREE.Group()
-      can.position.set(cx, 1.01, 0.03)
+      can.position.set(cx, 0.96, 0.03) // Sits flush on bench top surface
       object.add(can)
 
-      // Realistic metallic specular body with colored paint coating
-      const bodyMat = new THREE.MeshStandardMaterial({
+      // 1. Wet liquid paint pool
+      const paintLiquidMat = new THREE.MeshPhysicalMaterial({
         color: canColors[i],
-        roughness: 0.38,
-        metalness: 0.45,
+        roughness: 0.04,
+        metalness: 0.02,
+        clearcoat: 0.95,
+        clearcoatRoughness: 0.04,
       })
-      this.mesh(can, new THREE.CylinderGeometry(0.205, 0.22, 0.48, 24), bodyMat, [0, 0.25, 0])
-      // Brushed brass metallic rim & handle
-      this.mesh(can, new THREE.CylinderGeometry(0.213, 0.213, 0.045, 24), this.mats.brass, [0, 0.504, 0])
-      this.mesh(can, new THREE.CylinderGeometry(0.208, 0.208, 0.035, 24), this.mats.brass, [0, 0.02, 0])
 
-      // High-resolution Embossed Label Shield
-      const face = this.mesh(can, new THREE.PlaneGeometry(0.18, 0.22), this.mats.canvas, [0, 0.26, 0.214])
+      // 2. Main cylindrical tin body
+      this.mesh(can, new THREE.CylinderGeometry(0.20, 0.20, 0.44, 32), tinMat, [0, 0.22, 0])
+      // Rolled upper chime rim
+      const topChime = this.mesh(can, new THREE.TorusGeometry(0.202, 0.012, 12, 32), tinMat, [0, 0.44, 0])
+      topChime.rotation.x = Math.PI / 2
+      // Rolled bottom rim resting flush on table top
+      const botChime = this.mesh(can, new THREE.TorusGeometry(0.201, 0.008, 12, 32), tinMat, [0, 0.008, 0])
+      botChime.rotation.x = Math.PI / 2
+      // Recessed lid chime ring
+      this.mesh(can, new THREE.CylinderGeometry(0.185, 0.185, 0.04, 28), tinMat, [0, 0.42, 0])
+      // Sunken pool of liquid wet paint
+      const liquid = this.mesh(can, new THREE.CircleGeometry(0.178, 28), paintLiquidMat, [0, 0.405, 0])
+      liquid.rotation.x = -Math.PI / 2
+
+      // 3. Wire bail handle
+      const bail = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.006, 8, 24, Math.PI), bailMat)
+      bail.rotation.z = Math.PI
+      bail.rotation.x = 0.35
+      bail.position.set(0, 0.26, 0.05)
+      can.add(bail)
+      // Bail ear mounting lugs
+      this.mesh(can, new THREE.BoxGeometry(0.018, 0.035, 0.035), tinMat, [-0.205, 0.26, 0])
+      this.mesh(can, new THREE.BoxGeometry(0.018, 0.035, 0.035), tinMat, [0.205, 0.26, 0])
+
+      // 4. Clean Embossed Label Shield on the front
+      const labelBand = this.mesh(
+        can,
+        new THREE.CylinderGeometry(0.203, 0.203, 0.24, 32, 1, true, -Math.PI / 4, Math.PI / 2),
+        new THREE.MeshStandardMaterial({
+          color: 0xfbf8f1,
+          roughness: 0.85,
+          side: THREE.DoubleSide,
+        }),
+        [0, 0.22, 0],
+      )
+      labelBand.rotation.y = Math.PI
+
       const labelMat = new THREE.MeshBasicMaterial({ color: 0x003049, side: THREE.DoubleSide })
 
       if (i === 0) {
         // Circle (Cobalt Blue)
-        this.mesh(face, new THREE.CircleGeometry(0.065, 20), labelMat, [0, 0, 0.012])
+        this.mesh(can, new THREE.CircleGeometry(0.065, 24), labelMat, [0, 0.22, 0.205])
       } else if (i === 1) {
         // Triangle (Cadmium Lemon)
         const shape = new THREE.Shape()
         shape.moveTo(0, 0.08); shape.lineTo(0.075, -0.06); shape.lineTo(-0.075, -0.06); shape.closePath()
-        this.mesh(face, new THREE.ShapeGeometry(shape), labelMat, [0, 0, 0.012])
+        this.mesh(can, new THREE.ShapeGeometry(shape), labelMat, [0, 0.22, 0.205])
       } else if (i === 2) {
         // Square (Alizarin Crimson)
-        this.mesh(face, new THREE.PlaneGeometry(0.12, 0.12), labelMat, [0, 0, 0.012])
+        this.mesh(can, new THREE.PlaneGeometry(0.12, 0.12), labelMat, [0, 0.22, 0.205])
       } else {
         // Diamond (Titanium White)
         const shape = new THREE.Shape()
         shape.moveTo(0, 0.09); shape.lineTo(0.072, 0); shape.lineTo(0, -0.09); shape.lineTo(-0.072, 0); shape.closePath()
-        this.mesh(face, new THREE.ShapeGeometry(shape), labelMat, [0, 0, 0.012])
+        this.mesh(can, new THREE.ShapeGeometry(shape), labelMat, [0, 0.22, 0.205])
       }
 
       for (const child of can.children) child.userData.interaction = target
@@ -1000,6 +1049,27 @@ export class StudioWorld {
       stem.rotation.z = Math.sin(angle) * 0.4
       stem.rotation.x = Math.cos(angle) * 0.4
     }
+  }
+
+  private addStructuralPillar(x: number, z: number): void {
+    const pillar = new THREE.Group()
+    pillar.position.set(x, 0, z)
+    this.scene.add(pillar)
+
+    // 1. Classical profiled plinth base with Scotia / Torus skirting
+    this.mesh(pillar, new THREE.BoxGeometry(0.86, 0.16, 0.86), this.mats.travertine, [0, 0.08, 0])
+    this.mesh(pillar, new THREE.BoxGeometry(0.80, 0.08, 0.80), this.mats.champagneBronze, [0, 0.20, 0])
+    this.mesh(pillar, new THREE.BoxGeometry(0.74, 0.08, 0.74), this.mats.travertine, [0, 0.28, 0])
+
+    // 2. Chamfered stone shaft reaching to the ceiling timber trusses
+    this.mesh(pillar, new THREE.BoxGeometry(0.64, 4.8, 0.64), this.mats.travertine, [0, 2.72, 0])
+
+    // 3. Classical moulded capital
+    this.mesh(pillar, new THREE.BoxGeometry(0.76, 0.12, 0.76), this.mats.champagneBronze, [0, 5.18, 0])
+    this.mesh(pillar, new THREE.BoxGeometry(0.84, 0.16, 0.84), this.mats.darkWood, [0, 5.32, 0])
+
+    // Solid Rapier physics collider
+    this.physics.addStaticBox(v3(x, 2.7, z), v3(0.86, 5.4, 0.86))
   }
 
   // ─── Studio Props Implementations ──────────────────────────────────────
@@ -1785,67 +1855,32 @@ export class StudioWorld {
   }
 
   private floorMaterial(): THREE.MeshPhysicalMaterial {
-    const canvas = document.createElement('canvas')
-    canvas.width = 2048
-    canvas.height = 1024
-    const ctx = canvas.getContext('2d')!
+    const loader = new THREE.TextureLoader()
+    const diff = loader.load('/textures/oak_wood_planks/oak_wood_planks_diff_1k.jpg')
+    diff.colorSpace = THREE.SRGBColorSpace
+    diff.wrapS = diff.wrapT = THREE.RepeatWrapping
+    diff.repeat.set(6, 5)
+    diff.anisotropy = 16
 
-    ctx.fillStyle = '#e2d5bd'
-    ctx.fillRect(0, 0, 2048, 1024)
+    const nor = loader.load('/textures/oak_wood_planks/oak_wood_planks_nor_gl_1k.jpg')
+    nor.wrapS = nor.wrapT = THREE.RepeatWrapping
+    nor.repeat.set(6, 5)
+    nor.anisotropy = 16
 
-    const plankHeight = 128
-    for (let y = 0; y < 1024; y += plankHeight) {
-      const plankTone = ((y / plankHeight) % 4) * 5 - 8
-      ctx.fillStyle = `rgba(${226 + plankTone}, ${213 + plankTone}, ${189 + plankTone}, 0.38)`
-      ctx.fillRect(0, y, 2048, plankHeight)
+    const rough = loader.load('/textures/oak_wood_planks/oak_wood_planks_rough_1k.jpg')
+    rough.wrapS = rough.wrapT = THREE.RepeatWrapping
+    rough.repeat.set(6, 5)
+    rough.anisotropy = 16
 
-      ctx.fillStyle = 'rgba(75, 55, 35, 0.45)'
-      ctx.fillRect(0, y, 2048, 3)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
-      ctx.fillRect(0, y + 3, 2048, 1.5)
-
-      const xOffset = ((y / plankHeight) % 3) * 680 + 340
-      for (let x = xOffset; x < 2048; x += 1024) {
-        ctx.fillStyle = 'rgba(75, 55, 35, 0.45)'
-        ctx.fillRect(x % 2048, y, 3, plankHeight)
-      }
-
-      for (let py = y + 4; py < y + plankHeight - 4; py += 3) {
-        ctx.beginPath()
-        ctx.strokeStyle = `rgba(130, 105, 78, ${0.08 + Math.sin(py * 0.15) * 0.04})`
-        ctx.lineWidth = 1.1
-        ctx.moveTo(0, py + Math.sin(py * 0.04) * 4)
-        for (let x = 64; x <= 2048; x += 64) {
-          ctx.lineTo(x, py + Math.sin((x + py) * 0.02) * 3)
-        }
-        ctx.stroke()
-      }
-
-      if ((y / plankHeight) % 2 === 0) {
-        const kx = ((y * 7) % 1800) + 120
-        const ky = y + plankHeight / 2
-        ctx.beginPath()
-        ctx.ellipse(kx, ky, 22, 10, 0.1, 0, Math.PI * 2)
-        ctx.fillStyle = 'rgba(95, 68, 45, 0.25)'
-        ctx.fill()
-      }
-    }
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-    texture.repeat.set(4, 4)
-    texture.anisotropy = 8
-    texture.generateMipmaps = true
-
-    // Architectural French Oak with subtle polyurethane clearcoat & satin specular reflections
     return new THREE.MeshPhysicalMaterial({
-      map: texture,
-      color: 0xfbf6ee,
-      roughness: 0.32,
-      metalness: 0.02,
-      clearcoat: 0.18,
-      clearcoatRoughness: 0.28,
+      map: diff,
+      normalMap: nor,
+      normalScale: new THREE.Vector2(0.85, 0.85),
+      roughnessMap: rough,
+      roughness: 0.36,
+      metalness: 0.01,
+      clearcoat: 0.16,
+      clearcoatRoughness: 0.22,
     })
   }
 
@@ -1863,5 +1898,170 @@ export class StudioWorld {
     mesh.receiveShadow = true
     parent.add(mesh)
     return mesh
+  }
+
+  private loadGltfAssets(): void {
+    if (typeof window === 'undefined') return
+    import('three/examples/jsm/loaders/GLTFLoader.js')
+      .then(({ GLTFLoader }) => {
+        const loader = new GLTFLoader()
+
+        // 1. Classical Roman Marble Bust Sculpture
+        loader.load('/models/marble_bust_01/marble_bust_01_1k.gltf', gltf => {
+          const model = gltf.scene
+          model.position.set(-7.2, 1.18, -0.2)
+          model.scale.set(0.65, 0.65, 0.65)
+          model.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true
+              const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+              if (m && m.map) {
+                m.map.colorSpace = THREE.SRGBColorSpace
+                m.map.anisotropy = 16
+              }
+            }
+          })
+          this.scene.add(model)
+        })
+
+        // 2. Lush Potted Monstera / Ficus Plants
+        loader.load('/models/potted_plant_01/potted_plant_01_1k.gltf', gltf => {
+          const plantLocations = [
+            { pos: v3(-7.2, 0, -5.6), scale: 0.95 },
+            { pos: v3(7.2, 0, 5.8), scale: 0.9 },
+          ]
+          for (const loc of plantLocations) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(loc.pos)
+            clone.scale.setScalar(loc.scale)
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
+              }
+            })
+            this.scene.add(clone)
+          }
+        })
+
+        loader.load('/models/potted_plant_04/potted_plant_04_1k.gltf', gltf => {
+          const plant = gltf.scene
+          plant.position.set(7.2, 0, -5.6)
+          plant.scale.setScalar(1.1)
+          plant.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true
+              const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+              if (m && m.map) {
+                m.map.colorSpace = THREE.SRGBColorSpace
+                m.map.anisotropy = 16
+              }
+            }
+          })
+          this.scene.add(plant)
+        })
+
+        // 3. Realistic Cardboard Packaging Boxes with authentic text and barcodes
+        loader.load('/models/cardboard_box_01/cardboard_box_01_1k.gltf', gltf => {
+          const boxConfigs = [
+            { pos: v3(-1.8, 0, 3.6), scale: v3(1.1, 1.0, 1.1), rotY: 0.18 },
+            { pos: v3(-1.75, 0.44, 3.65), scale: v3(0.9, 0.85, 0.9), rotY: -0.14 },
+            { pos: v3(7.1, 0, 1.9), scale: v3(1.2, 1.0, 1.1), rotY: 0.05 },
+            { pos: v3(5.2, 0, 6.2), scale: v3(1.0, 0.9, 1.0), rotY: -0.32 },
+            { pos: v3(-4.8, 0, -6.2), scale: v3(0.95, 0.9, 0.95), rotY: 0.25 },
+          ]
+          for (const cfg of boxConfigs) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(cfg.pos)
+            clone.scale.copy(cfg.scale)
+            clone.rotation.y = cfg.rotY
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
+              }
+            })
+            this.scene.add(clone)
+          }
+        })
+
+        // 4. Architectural Wooden Bookshelf
+        loader.load('/models/wooden_bookshelf_worn/wooden_bookshelf_worn_1k.gltf', gltf => {
+          const shelf = gltf.scene
+          shelf.position.set(6.85, 0, -0.25)
+          shelf.rotation.y = -Math.PI / 2
+          shelf.scale.set(1.1, 1.05, 1.1)
+          shelf.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true
+              const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+              if (m && m.map) {
+                m.map.colorSpace = THREE.SRGBColorSpace
+                m.map.anisotropy = 16
+              }
+            }
+          })
+          this.scene.add(shelf)
+        })
+
+        // 5. Studio Wooden Benches
+        loader.load('/models/painted_wooden_bench/painted_wooden_bench_1k.gltf', gltf => {
+          const benchLocations = [
+            { pos: v3(3.4, 0, 4.8), rotY: 0, scale: 1.1 },
+            { pos: v3(0, 0, -1.8), rotY: 0, scale: 1.15 },
+          ]
+          for (const loc of benchLocations) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(loc.pos)
+            clone.rotation.y = loc.rotY
+            clone.scale.setScalar(loc.scale)
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
+              }
+            })
+            this.scene.add(clone)
+          }
+        })
+
+        // 6. Studio Wooden Stool
+        loader.load('/models/wooden_stool_01/wooden_stool_01_1k.gltf', gltf => {
+          const stool = gltf.scene
+          stool.position.set(-3.25, 0, 1.95)
+          stool.scale.setScalar(1.05)
+          stool.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true
+              child.receiveShadow = true
+              const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+              if (m && m.map) {
+                m.map.colorSpace = THREE.SRGBColorSpace
+                m.map.anisotropy = 16
+              }
+            }
+          })
+          this.scene.add(stool)
+        })
+      })
+      .catch(err => console.warn('GLTFLoader error:', err))
   }
 }

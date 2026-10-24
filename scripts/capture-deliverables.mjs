@@ -63,6 +63,20 @@ async function run() {
   await page.screenshot({ path: '.work/previews/deliverable-windows-and-easel.png' })
   console.log('   Saved .work/previews/deliverable-windows-and-easel.png')
 
+  // Query performance stats from WebGL
+  const stats = await page.evaluate(() => {
+    const gl = window.__game.game.renderer.gl
+    return {
+      drawCalls: gl.info.render.calls,
+      triangles: gl.info.render.triangles,
+      points: gl.info.render.points,
+      lines: gl.info.render.lines,
+      geometries: gl.info.memory.geometries,
+      textures: gl.info.memory.textures,
+    }
+  })
+  console.log('WebGL Performance Metrics:', stats)
+
   console.log(`Console error count: ${consoleErrors.length}`)
   if (consoleErrors.length > 0) {
     console.error('Console errors:', consoleErrors)

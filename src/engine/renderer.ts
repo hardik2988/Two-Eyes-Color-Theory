@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
@@ -50,7 +51,7 @@ export class Renderer {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: this.preset.antialias, powerPreference: 'high-performance' })
     this.gl.outputColorSpace = THREE.SRGBColorSpace
     this.gl.toneMapping = THREE.ACESFilmicToneMapping
-    this.gl.toneMappingExposure = 0.92
+    this.gl.toneMappingExposure = 0.85
     this.gl.shadowMap.type = THREE.PCFSoftShadowMap
 
     this.lensPass = new ShaderPass(LENS_SHADER)
@@ -113,19 +114,32 @@ export class Renderer {
     // 1. Base 3D Scene Render Pass
     this.composer.addPass(new RenderPass(scene, camera))
 
-    // 2. Optical Bloom (Architectural highlight glow on daylight sunbeams and gallery sconces)
+    // 2. High-Quality Ground Truth Ambient Occlusion (Contact shadows under props, benches, boxes)
+    if (this.preset.shadows) {
+      const gtao = new GTAOPass(scene, camera, size.x, size.y)
+      gtao.output = GTAOPass.OUTPUT.Default
+      gtao.blendIntensity = 0.85
+      gtao.updateGtaoMaterial({
+        radius: 0.35,
+        distanceFallOff: 1.0,
+        scale: 1.0,
+      })
+      this.composer.addPass(gtao)
+    }
+
+    // 3. Optical Bloom (High threshold, subtle highlight glow on sunbeams & lighting)
     if (this.preset.bloom) {
-      this.bloom = new UnrealBloomPass(size, 0.32, 0.25, 1.15)
+      this.bloom = new UnrealBloomPass(size, 0.16, 0.18, 0.95)
       this.composer.addPass(this.bloom)
     }
 
-    // 3. ACES Filmic Tone Mapping and sRGB output encoding
+    // 4. ACES Filmic Tone Mapping and sRGB output encoding
     this.composer.addPass(new OutputPass())
 
-    // 4. Subtle Architectural Lens Vignette and Microscopic Film Grain
+    // 5. Subtle Architectural Lens Vignette and Microscopic Film Grain
     this.composer.addPass(this.lensPass)
 
-    // 5. FINAL PASS: Color-Vision Simulation (Applied LAST so post-processing never corrupts deuteranopia matrix)
+    // 6. FINAL PASS: Color-Vision Simulation (Applied LAST so post-processing never corrupts deuteranopia matrix)
     this.composer.addPass(this.visionPass)
 
     this.composer.setSize(size.x, size.y)
