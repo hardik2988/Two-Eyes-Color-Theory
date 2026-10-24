@@ -155,9 +155,9 @@ async function run() {
   if (!l4Solved) throw new Error('Level 4 failed to register as solved!')
   console.log('   ✓ Level 4 (Vault Door) solved and recorded!')
 
-  // Click proceed / wait for completion modal
+  // Click proceed / wait for completion modal (vault mechanical animation takes ~2.5s)
   await page.locator('[data-action="puzzle-submit"]').click()
-  await page.waitForSelector('[data-screen="results"].is-active', { timeout: 5000 })
+  await page.waitForSelector('[data-screen="results"].is-active', { timeout: 8000 })
   const quote = await page.locator('.completion-quote').innerText()
   console.log(`7. Exhibition Climax Screen Active! Ending Quote: "${quote}"`)
 

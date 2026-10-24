@@ -199,7 +199,15 @@ async function boot(): Promise<void> {
   })
   new TouchControls(document.getElementById('ui')!, input, () => g.mode === 'playing')
 
-  window.setTimeout(() => ui.show('title'), 250)
+  window.setTimeout(() => {
+    ui.show('title')
+    canvas.classList.add('is-ready')
+    const curtain = document.getElementById('boot-curtain')
+    if (curtain) {
+      curtain.style.opacity = '0'
+      window.setTimeout(() => curtain.remove(), 400)
+    }
+  }, 250)
   // Debug/test hook (read-only use): smoke tests inspect run state through it.
   ;(window as unknown as { __game: unknown }).__game = { game: g, ui, input, save }
 }

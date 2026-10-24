@@ -8,8 +8,26 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preload" href="./fonts/ManusCC0-Bold.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="preload" href="./fonts/ManusCC0-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      #boot-curtain {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        background: radial-gradient(ellipse at 50% 48%, #fffbf2 0%, #fdf0d5 70%, #f4e2be 100%);
+        pointer-events: none;
+        transition: opacity 0.35s ease;
+      }
+      #game {
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
+      #game.is-ready {
+        opacity: 1;
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-curtain"></div>
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>

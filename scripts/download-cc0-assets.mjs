@@ -91,8 +91,10 @@ async function downloadHdri2k() {
 async function main() {
   const models = [
     'cardboard_box_01',
+    'wooden_crate_01',
     'marble_bust_01',
     'potted_plant_01',
+    'potted_plant_02',
     'potted_plant_04',
     'wooden_table_02',
     'wooden_stool_01',

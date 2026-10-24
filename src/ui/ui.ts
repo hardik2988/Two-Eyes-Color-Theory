@@ -480,6 +480,10 @@ export class Ui {
 
     const puzzleSubmitBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="puzzle-submit"]')
     if (puzzleSubmitBtn) {
+      if (this.activePuzzle?.isComplete) {
+        this.closePuzzle()
+        return
+      }
       this.testPuzzleSolution()
       return
     }

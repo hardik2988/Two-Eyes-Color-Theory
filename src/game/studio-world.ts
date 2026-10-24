@@ -443,10 +443,11 @@ export class StudioWorld {
     // Studio Shelving and Storage
     this.addArchitecturalShelving()
 
-    // Botanical accents & Sculptural Seating
-    this.addFiddleLeafPlant(-7.2, -5.6)
-    this.addMonsteraPlant(7.2, 5.8)
-    this.addFiddleLeafPlant(7.2, -5.6)
+    // Botanical accents physics colliders (visual models loaded via photorealistic GLTF)
+    this.physics.addStaticCylinder(v3(-7.2, 0.35, -5.6), 0.35, 0.7)
+    this.physics.addStaticCylinder(v3(7.2, 0.35, -5.6), 0.35, 0.7)
+    this.physics.addStaticCylinder(v3(7.2, 0.25, 5.8), 0.35, 0.5)
+    this.physics.addStaticCylinder(v3(-7.2, 0.25, 5.8), 0.35, 0.5)
     this.addArchitecturalBench(0, -1.8)
     this.addStool(-1.9, -0.45)
 
@@ -457,21 +458,19 @@ export class StudioWorld {
 
   /** Populates the studio with realistic artist props, wooden crates, cardboard boxes, and supplies */
   private buildStudioProps(): void {
-    // 1. Wooden Fine-Art Shipping Crates
-    this.addShippingCrate(this.scene, v3(-7.2, 0.45, -3.2), v3(1.1, 0.9, 0.8), 0.12, 'TWO EYES ART · LOT 01')
-    this.addShippingCrate(this.scene, v3(-6.9, 1.25, -3.15), v3(0.85, 0.7, 0.75), -0.08, 'EYESEE HANDLING')
-    this.addShippingCrate(this.scene, v3(6.8, 0.45, 3.8), v3(1.2, 0.9, 0.85), -0.22, 'PIGMENTS & OILS · 04')
-    this.addShippingCrate(this.scene, v3(5.6, 0.35, -5.8), v3(1.0, 0.7, 0.7), 0.35, 'VAULT ARCHIVE · 02')
+    // 1. Wooden Fine-Art Shipping Crates (Physics colliders; visual models loaded via GLTF)
+    this.physics.addStaticBox(v3(-7.2, 0.35, -3.2), v3(1.0, 0.7, 0.8))
+    this.physics.addStaticBox(v3(6.8, 0.25, 3.8), v3(1.0, 0.5, 0.6))
+    this.physics.addStaticBox(v3(5.6, 0.25, -5.8), v3(1.0, 0.5, 0.6))
 
-    // 2. Corrugated Cardboard Packaging Boxes
-    this.addCardboardBox(this.scene, v3(-1.8, 0.28, 3.6), v3(0.65, 0.55, 0.55), 0.18, false)
-    this.addCardboardBox(this.scene, v3(-1.75, 0.78, 3.65), v3(0.52, 0.45, 0.48), -0.14, false)
-    this.addCardboardBox(this.scene, v3(7.1, 0.28, 1.9), v3(0.7, 0.55, 0.6), 0.05, false)
-    this.addCardboardBox(this.scene, v3(5.2, 0.25, 6.2), v3(0.6, 0.5, 0.5), -0.32, false)
-    this.addCardboardBox(this.scene, v3(-4.8, 0.25, -6.2), v3(0.55, 0.5, 0.5), 0.25, false)
+    // 2. Corrugated Cardboard Packaging Boxes (Physics colliders; visual models loaded via GLTF)
+    this.physics.addStaticBox(v3(-1.8, 0.38, 3.6), v3(0.65, 0.75, 0.65))
+    this.physics.addStaticBox(v3(7.1, 0.21, 1.9), v3(0.6, 0.42, 0.6))
+    this.physics.addStaticBox(v3(5.2, 0.19, 6.2), v3(0.55, 0.38, 0.55))
+    this.physics.addStaticBox(v3(-4.8, 0.18, -6.2), v3(0.5, 0.36, 0.5))
 
     // 3. Stretched Artist Canvases Leaning on Walls
-    this.addLeaningCanvases(this.scene, v3(-5.8, 0, 7.25), 0)
+    this.addLeaningCanvases(this.scene, v3(-5.8, 0, 6.95), 0)
     this.addLeaningCanvases(this.scene, v3(-8.72, 0, -1.8), Math.PI / 2)
 
     // 4. Stacks of Fine Art Reference Books
@@ -1034,40 +1033,6 @@ export class StudioWorld {
     }
   }
 
-  private addFiddleLeafPlant(x: number, z: number): void {
-    const pot = this.mesh(this.scene, new THREE.CylinderGeometry(0.35, 0.44, 0.68, 20), this.mats.pottery, [x, 0.34, z])
-    pot.castShadow = true
-    this.physics.addStaticCylinder(v3(x, 0.34, z), 0.4, 0.68)
-
-    // Architectural plant stems and broad sculptural leaves
-    for (let i = 0; i < 7; i++) {
-      const angle = (i * Math.PI * 2) / 7
-      const height = 1.1 + (i % 3) * 0.25
-      const leafGroup = new THREE.Group()
-      leafGroup.position.set(x + Math.cos(angle) * 0.15, 0.68 + height * 0.4, z + Math.sin(angle) * 0.15)
-      leafGroup.rotation.y = angle
-      leafGroup.rotation.z = 0.35
-      this.scene.add(leafGroup)
-      this.mesh(leafGroup, new THREE.ConeGeometry(0.24, 0.85, 8), this.mats.leaf, [0, 0.4, 0])
-    }
-  }
-
-  private addMonsteraPlant(x: number, z: number): void {
-    this.mesh(this.scene, new THREE.CylinderGeometry(0.38, 0.46, 0.72, 20), this.mats.pottery, [x, 0.36, z])
-    this.physics.addStaticCylinder(v3(x, 0.36, z), 0.42, 0.72)
-
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI * 2) / 6
-      const stem = this.mesh(this.scene, new THREE.CylinderGeometry(0.02, 0.03, 1.2, 8), this.mats.leaf, [
-        x + Math.cos(angle) * 0.2,
-        0.9,
-        z + Math.sin(angle) * 0.2,
-      ])
-      stem.rotation.z = Math.sin(angle) * 0.4
-      stem.rotation.x = Math.cos(angle) * 0.4
-    }
-  }
-
   private addStructuralPillar(x: number, z: number): void {
     const pillar = new THREE.Group()
     pillar.position.set(x, 0, z)
@@ -1091,55 +1056,6 @@ export class StudioWorld {
 
   // ─── Studio Props Implementations ──────────────────────────────────────
 
-  private addShippingCrate(parent: THREE.Object3D, center: THREE.Vector3, size: THREE.Vector3, rotY: number, _label: string): void {
-    const crate = new THREE.Group()
-    crate.position.copy(center)
-    crate.rotation.y = rotY
-    parent.add(crate)
-
-    this.mesh(crate, new THREE.BoxGeometry(size.x, size.y, size.z), this.mats.crate, [0, 0, 0])
-
-    // Dark iron corner reinforcements
-    const cornerMat = this.mats.blackSteel
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
-        for (const sz of [-1, 1]) {
-          const cx = (size.x / 2 - 0.04) * sx
-          const cy = (size.y / 2 - 0.04) * sy
-          const cz = (size.z / 2 - 0.04) * sz
-          this.mesh(crate, new THREE.BoxGeometry(0.08, 0.08, 0.08), cornerMat, [cx, cy, cz])
-        }
-      }
-    }
-
-    // Wooden edge batten trim
-    const battenMat = this.mats.darkWood
-    for (const sx of [-1, 1]) {
-      this.mesh(crate, new THREE.BoxGeometry(0.06, size.y, 0.06), battenMat, [(size.x / 2 - 0.03) * sx, 0, size.z / 2 - 0.03])
-      this.mesh(crate, new THREE.BoxGeometry(0.06, size.y, 0.06), battenMat, [(size.x / 2 - 0.03) * sx, 0, -size.z / 2 + 0.03])
-    }
-
-    this.physics.addStaticBox(center, size)
-  }
-
-  private addCardboardBox(parent: THREE.Object3D, center: THREE.Vector3, size: THREE.Vector3, rotY: number, _hasOpenLid: boolean): void {
-    const box = new THREE.Group()
-    box.position.copy(center)
-    box.rotation.y = rotY
-    parent.add(box)
-
-    this.mesh(box, new THREE.BoxGeometry(size.x, size.y, size.z), this.mats.cardboard, [0, 0, 0])
-
-    const tapeMat = new THREE.MeshStandardMaterial({
-      color: 0xb58b56,
-      roughness: 0.35,
-      metalness: 0.1,
-    })
-    this.mesh(box, new THREE.BoxGeometry(size.x + 0.01, 0.01, 0.08), tapeMat, [0, size.y / 2 + 0.005, 0])
-
-    this.physics.addStaticBox(center, size)
-  }
-
   private addLeaningCanvases(parent: THREE.Object3D, base: THREE.Vector3, rotY: number): void {
     const cluster = new THREE.Group()
     cluster.position.copy(base)
@@ -1147,20 +1063,20 @@ export class StudioWorld {
     parent.add(cluster)
 
     const sizes = [
-      { w: 1.4, h: 1.8, d: 0.06, tilt: -0.12, offsetZ: 0 },
-      { w: 1.2, h: 1.5, d: 0.05, tilt: -0.15, offsetZ: 0.12 },
-      { w: 0.9, h: 1.2, d: 0.04, tilt: -0.18, offsetZ: 0.22 },
+      { w: 1.3, h: 1.6, d: 0.05, tilt: -0.1, offsetZ: 0 },
+      { w: 1.1, h: 1.35, d: 0.045, tilt: -0.12, offsetZ: 0.08 },
+      { w: 0.85, h: 1.1, d: 0.04, tilt: -0.14, offsetZ: 0.15 },
     ]
 
     for (let i = 0; i < sizes.length; i++) {
       const s = sizes[i]
       const canvasGroup = new THREE.Group()
-      canvasGroup.position.set((i - 1) * 0.32, s.h / 2, s.offsetZ)
+      canvasGroup.position.set((i - 1) * 0.28, s.h / 2, s.offsetZ)
       canvasGroup.rotation.x = s.tilt
       cluster.add(canvasGroup)
 
-      this.mesh(canvasGroup, new THREE.BoxGeometry(s.w, s.h, s.d), this.mats.wood, [0, 0, 0])
-      this.mesh(canvasGroup, new THREE.BoxGeometry(s.w - 0.08, s.h - 0.08, 0.01), this.mats.canvas, [0, 0, -s.d / 2 - 0.005])
+      this.mesh(canvasGroup, new THREE.BoxGeometry(s.w, s.h, s.d), this.mats.darkWood, [0, 0, 0])
+      this.mesh(canvasGroup, new THREE.BoxGeometry(s.w - 0.03, s.h - 0.03, s.d + 0.002), this.mats.canvas, [0, 0, 0])
     }
   }
 
@@ -1942,13 +1858,65 @@ export class StudioWorld {
           this.scene.add(model)
         })
 
-        // 2. Lush Potted Monstera / Ficus Plants
+        // 2. Real Botanical Potted Plants (Tall Ficus Tree)
         loader.load('/models/potted_plant_01/potted_plant_01_1k.gltf', gltf => {
           const plantLocations = [
-            { pos: v3(-7.2, 0, -5.6), scale: 0.95 },
-            { pos: v3(7.2, 0, 5.8), scale: 0.9 },
+            { pos: v3(-7.2, 0, -5.6), scale: 1.0, rotY: 0.2 },
+            { pos: v3(7.2, 0, -5.6), scale: 1.05, rotY: -0.8 },
           ]
           for (const loc of plantLocations) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(loc.pos)
+            clone.scale.setScalar(loc.scale)
+            clone.rotation.y = loc.rotY
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
+              }
+            })
+            this.scene.add(clone)
+          }
+        })
+
+        // 3. Real Botanical Tropical Broad-Leaf Potted Plants (Lush Monstera / Philodendron)
+        loader.load('/models/potted_plant_02/potted_plant_02_1k.gltf', gltf => {
+          const plantLocations = [
+            { pos: v3(7.2, 0, 5.8), scale: 1.05, rotY: 0.4 },
+            { pos: v3(-7.2, 0, 5.8), scale: 0.95, rotY: -0.6 },
+          ]
+          for (const loc of plantLocations) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(loc.pos)
+            clone.scale.setScalar(loc.scale)
+            clone.rotation.y = loc.rotY
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
+              }
+            })
+            this.scene.add(clone)
+          }
+        })
+
+        // 4. Accent Greenery (Tabletop / Shelf Succulents)
+        loader.load('/models/potted_plant_04/potted_plant_04_1k.gltf', gltf => {
+          const accentLocations = [
+            { pos: v3(6.85, 1.88, 0.4), scale: 1.2 },
+            { pos: v3(0.9, 0.88, -4.9), scale: 0.95 },
+          ]
+          for (const loc of accentLocations) {
             const clone = gltf.scene.clone(true)
             clone.position.copy(loc.pos)
             clone.scale.setScalar(loc.scale)
@@ -1967,32 +1935,44 @@ export class StudioWorld {
           }
         })
 
-        loader.load('/models/potted_plant_04/potted_plant_04_1k.gltf', gltf => {
-          const plant = gltf.scene
-          plant.position.set(7.2, 0, -5.6)
-          plant.scale.setScalar(1.1)
-          plant.traverse(child => {
-            if ((child as THREE.Mesh).isMesh) {
-              child.castShadow = true
-              child.receiveShadow = true
-              const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
-              if (m && m.map) {
-                m.map.colorSpace = THREE.SRGBColorSpace
-                m.map.anisotropy = 16
+        // 5. Realistic Wooden Fine-Art Shipping Crates (Zero Z-Fighting, authentic wood grain & joints)
+        loader.load('/models/wooden_crate_01/wooden_crate_01_1k.gltf', gltf => {
+          const crateConfigs = [
+            { pos: v3(-7.2, 0, -3.2), scale: 1.15, rotY: 0.12 },
+            { pos: v3(-7.15, 0.393, -3.18), scale: 0.95, rotY: -0.06 },
+            { pos: v3(6.8, 0, 3.8), scale: 1.2, rotY: -0.22 },
+            { pos: v3(5.6, 0, -5.8), scale: 1.1, rotY: 0.35 },
+          ]
+          for (const cfg of crateConfigs) {
+            const clone = gltf.scene.clone(true)
+            clone.position.copy(cfg.pos)
+            clone.scale.setScalar(cfg.scale)
+            clone.rotation.y = cfg.rotY
+            clone.traverse(child => {
+              if ((child as THREE.Mesh).isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+                if (m && m.map) {
+                  m.map.colorSpace = THREE.SRGBColorSpace
+                  m.map.anisotropy = 16
+                }
               }
-            }
-          })
-          this.scene.add(plant)
+            })
+            this.scene.add(clone)
+          }
         })
 
-        // 3. Realistic Cardboard Packaging Boxes with authentic text and barcodes
+        // 6. Realistic Corrugated Cardboard Packaging Boxes (Proper elevation, zero clipping)
         loader.load('/models/cardboard_box_01/cardboard_box_01_1k.gltf', gltf => {
           const boxConfigs = [
-            { pos: v3(-1.8, 0, 3.6), scale: v3(1.1, 1.0, 1.1), rotY: 0.18 },
-            { pos: v3(-1.75, 0.44, 3.65), scale: v3(0.9, 0.85, 0.9), rotY: -0.14 },
-            { pos: v3(7.1, 0, 1.9), scale: v3(1.2, 1.0, 1.1), rotY: 0.05 },
-            { pos: v3(5.2, 0, 6.2), scale: v3(1.0, 0.9, 1.0), rotY: -0.32 },
-            { pos: v3(-4.8, 0, -6.2), scale: v3(0.95, 0.9, 0.95), rotY: 0.25 },
+            // Realistic Stack at Gallery Left (resting cleanly on floor and stacked with 0 z-fighting)
+            { pos: v3(-1.8, 0.220, 3.6), scale: v3(1.2, 1.2, 1.2), rotY: 0.18 },
+            { pos: v3(-1.78, 0.593, 3.62), scale: v3(1.0, 1.0, 1.0), rotY: -0.12 },
+            // Wall accents
+            { pos: v3(7.1, 0.211, 1.9), scale: v3(1.15, 1.15, 1.15), rotY: 0.05 },
+            { pos: v3(5.2, 0.193, 6.2), scale: v3(1.05, 1.05, 1.05), rotY: -0.32 },
+            { pos: v3(-4.8, 0.183, -6.2), scale: v3(1.0, 1.0, 1.0), rotY: 0.25 },
           ]
           for (const cfg of boxConfigs) {
             const clone = gltf.scene.clone(true)
