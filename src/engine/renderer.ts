@@ -5,6 +5,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
 import { DEUTERANOPIA_SHADER } from './color-vision'
 import { LENS_SHADER } from './lens-shader'
 import type { Quality } from './save'
@@ -19,7 +20,7 @@ type Preset = {
 }
 export const QUALITY_PRESETS: Record<Quality, Preset> = {
   low: { pixelRatio: 1.0, shadows: false, shadowMap: 512, bloom: false, gtao: false, antialias: false },
-  medium: { pixelRatio: 1.0, shadows: true, shadowMap: 1024, bloom: false, gtao: false, antialias: true },
+  medium: { pixelRatio: 1.0, shadows: true, shadowMap: 1024, bloom: true, gtao: true, antialias: true },
   high: { pixelRatio: 1.25, shadows: true, shadowMap: 1024, bloom: true, gtao: true, antialias: true },
   ultra: { pixelRatio: 1.5, shadows: true, shadowMap: 2048, bloom: true, gtao: true, antialias: true },
 }
@@ -41,6 +42,7 @@ export class Renderer {
   readonly gl: THREE.WebGLRenderer
   private composer?: EffectComposer
   private bloom?: UnrealBloomPass
+  private smaaPass?: SMAAPass
   private readonly lensPass: ShaderPass
   private readonly visionPass: ShaderPass
   private visionStrength_ = 0
@@ -58,7 +60,7 @@ export class Renderer {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: this.preset.antialias, powerPreference: 'high-performance' })
     this.gl.outputColorSpace = THREE.SRGBColorSpace
     this.gl.toneMapping = THREE.ACESFilmicToneMapping
-    this.gl.toneMappingExposure = 0.85
+    this.gl.toneMappingExposure = 0.80
     this.gl.shadowMap.type = THREE.PCFSoftShadowMap
 
     this.lensPass = new ShaderPass(LENS_SHADER)
@@ -101,9 +103,11 @@ export class Renderer {
     this.gl.shadowMap.enabled = this.preset.shadows
     this.gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio, 2.0))
     this.bloom?.dispose()
+    this.smaaPass?.dispose()
     this.composer?.dispose()
     this.composer = undefined
     this.bloom = undefined
+    this.smaaPass = undefined
     this.resize()
   }
 
@@ -121,37 +125,43 @@ export class Renderer {
     // 1. Base 3D Scene Render Pass
     this.composer.addPass(new RenderPass(scene, camera))
 
-    // 2. High-Performance Ground Truth Ambient Occlusion (Half-res, only on High/Ultra presets)
+    // 2. High-Performance Ground Truth Ambient Occlusion (Strong contact grounding)
     if (this.preset.gtao) {
       const gtaoW = Math.max(320, Math.floor(size.x * 0.5))
       const gtaoH = Math.max(240, Math.floor(size.y * 0.5))
       const gtao = new GTAOPass(scene, camera, gtaoW, gtaoH)
       gtao.output = GTAOPass.OUTPUT.Default
-      gtao.blendIntensity = 0.72
-      gtao.pdSamples = 8
-      gtao.pdRings = 2
+      gtao.blendIntensity = 1.35
+      gtao.pdSamples = 16
+      gtao.pdRings = 3
       gtao.updateGtaoMaterial({
-        radius: 0.35,
+        radius: 0.5,
         distanceFallOff: 1.0,
-        scale: 1.0,
+        scale: 1.15,
       })
       this.composer.addPass(gtao)
     }
 
-    // 3. Optical Bloom (Half-res for efficiency, subtle highlight glow)
+    // 3. Gentle Optical Bloom (Threshold 0.97: limited strictly to sun and window specular highlights)
     if (this.preset.bloom) {
       const bloomSize = new THREE.Vector2(Math.floor(size.x * 0.5), Math.floor(size.y * 0.5))
-      this.bloom = new UnrealBloomPass(bloomSize, 0.16, 0.18, 0.95)
+      this.bloom = new UnrealBloomPass(bloomSize, 0.12, 0.20, 0.97)
       this.composer.addPass(this.bloom)
     }
 
     // 4. ACES Filmic Tone Mapping and sRGB output encoding
     this.composer.addPass(new OutputPass())
 
-    // 5. Subtle Architectural Lens Vignette and Microscopic Film Grain
+    // 5. Subpixel Morphological Antialiasing (SMAA) for ultra-clean geometric edges on thin lines
+    if (this.preset.antialias) {
+      this.smaaPass = new SMAAPass()
+      this.composer.addPass(this.smaaPass)
+    }
+
+    // 6. Subtle Architectural Lens Vignette and Microscopic Film Grain
     this.composer.addPass(this.lensPass)
 
-    // 6. FINAL PASS: Color-Vision Simulation (Applied LAST so post-processing never corrupts deuteranopia matrix)
+    // 7. FINAL PASS: Color-Vision Simulation (Applied LAST so post-processing never corrupts deuteranopia matrix)
     this.composer.addPass(this.visionPass)
 
     this.composer.setSize(size.x, size.y)
@@ -163,6 +173,7 @@ export class Renderer {
     const h = this.canvas.clientHeight || window.innerHeight
     this.gl.setSize(w, h, false)
     this.composer?.setSize(w, h)
+    this.smaaPass?.setSize(w, h)
     if (this.camera) {
       this.camera.aspect = w / h
       this.camera.updateProjectionMatrix()

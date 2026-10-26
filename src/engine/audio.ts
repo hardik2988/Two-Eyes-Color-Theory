@@ -1,9 +1,10 @@
 /**
  * Web Audio mixer with music and SFX buses. Browsers only allow audio after a user gesture, so
- * call `unlock()` from the first click/key press (the title screen does this).
+ * call `unlock()` from the first click/key press (the title screen and user inputs do this).
  *
- * The starter ships no audio files: SFX are synthesized and the music is a generative ambient
- * pad. To use recorded assets, `load(url)` an AudioBuffer and `playBuffer()` it on either bus.
+ * Implements physical acoustic modeling (modal synthesis, resonant cavity filters,
+ * multi-layer transients, and architectural gallery room reverberation) for organic,
+ * hyper-realistic auditory feedback.
  */
 export type Sfx =
   | 'pickup'
@@ -11,13 +12,22 @@ export type Sfx =
   | 'land'
   | 'hurt'
   | 'ui'
+  | 'ui_hover'
+  | 'slider'
   | 'win'
   | 'lose'
   | 'dash'
   | 'footstep'
   | 'paint'
+  | 'paint_drop'
+  | 'palette_scrape'
   | 'frame'
+  | 'frame_slide'
+  | 'easel_adjust'
   | 'vault_bolt'
+  | 'keypad_press'
+  | 'lens_flip'
+  | 'station_focus'
   | 'puzzle_success'
   | 'puzzle_fail'
 
@@ -26,18 +36,79 @@ export class Audio {
   private master: GainNode
   private music: GainNode
   private sfx: GainNode
+  private sfxDry: GainNode
+  private reverb: ConvolverNode
+  private reverbGain: GainNode
+  private whiteNoiseBuf: AudioBuffer
+  private pinkNoiseBuf: AudioBuffer
   private musicTimer = 0
   private musicOn = false
   private buffers = new Map<string, AudioBuffer>()
+  private stepAlt = false
 
   constructor() {
-    this.ctx = new AudioContext()
+    const AudioCtx =
+      typeof window !== 'undefined'
+        ? window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        : AudioContext
+    this.ctx = new AudioCtx()
     this.master = this.ctx.createGain()
     this.music = this.ctx.createGain()
     this.sfx = this.ctx.createGain()
+    this.sfxDry = this.ctx.createGain()
+    this.reverbGain = this.ctx.createGain()
+
+    // Bus routing: dry path and wet room reverb path both feed into SFX bus
+    this.sfxDry.connect(this.sfx)
+    this.reverbGain.connect(this.sfx)
+
     this.music.connect(this.master)
     this.sfx.connect(this.master)
     this.master.connect(this.ctx.destination)
+
+    // Pre-generate noise buffers (1 second at native sample rate)
+    const sr = this.ctx.sampleRate || 44100
+    this.whiteNoiseBuf = this.ctx.createBuffer(1, sr, sr)
+    const wData = this.whiteNoiseBuf.getChannelData(0)
+    for (let i = 0; i < sr; i++) wData[i] = Math.random() * 2 - 1
+
+    this.pinkNoiseBuf = this.ctx.createBuffer(1, sr, sr)
+    const pData = this.pinkNoiseBuf.getChannelData(0)
+    let b0 = 0,
+      b1 = 0,
+      b2 = 0,
+      b3 = 0,
+      b4 = 0,
+      b5 = 0,
+      b6 = 0
+    for (let i = 0; i < sr; i++) {
+      const white = Math.random() * 2 - 1
+      b0 = 0.99886 * b0 + white * 0.0555179
+      b1 = 0.99332 * b1 + white * 0.0750759
+      b2 = 0.969 * b2 + white * 0.153852
+      b3 = 0.8665 * b3 + white * 0.3104856
+      b4 = 0.55 * b4 + white * 0.5329522
+      b5 = -0.7616 * b5 - white * 0.016898
+      pData[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11
+      b6 = white * 0.115926
+    }
+
+    // Pre-generate gallery acoustic impulse response (high-ceiling architectural space)
+    const revDur = 1.0
+    const revLen = Math.floor(sr * revDur)
+    const revBuf = this.ctx.createBuffer(2, revLen, sr)
+    const rL = revBuf.getChannelData(0)
+    const rR = revBuf.getChannelData(1)
+    for (let i = 0; i < revLen; i++) {
+      const decay = Math.exp(-i / (sr * 0.28))
+      rL[i] = (Math.random() * 2 - 1) * decay
+      rR[i] = (Math.random() * 2 - 1) * decay
+    }
+    this.reverb = this.ctx.createConvolver()
+    this.reverb.buffer = revBuf
+    this.reverb.connect(this.reverbGain)
+    this.reverbGain.gain.setValueAtTime(0.2, this.ctx.currentTime)
   }
 
   unlock(): void {
@@ -47,6 +118,8 @@ export class Audio {
   /** Volumes in 0..1. */
   setVolumes(music: number, sfx: number, muted = false): void {
     const t = this.ctx.currentTime
+    this.music.gain.cancelScheduledValues(t)
+    this.sfx.gain.cancelScheduledValues(t)
     this.music.gain.setTargetAtTime(muted ? 0 : music * 0.55, t, 0.05)
     this.sfx.gain.setTargetAtTime(muted ? 0 : sfx * 0.8, t, 0.05)
   }
@@ -69,112 +142,287 @@ export class Audio {
     return src
   }
 
+  private playTone(
+    freq: number,
+    endFreq: number,
+    dur: number,
+    type: OscillatorType,
+    vol: number,
+    opts?: {
+      delay?: number
+      filterFreq?: number
+      filterType?: BiquadFilterType
+      filterQ?: number
+      reverb?: number
+    },
+  ): void {
+    const t = this.ctx.currentTime + (opts?.delay ?? 0)
+    const osc = this.ctx.createOscillator()
+    const gain = this.ctx.createGain()
+    osc.type = type
+    osc.frequency.setValueAtTime(Math.max(20, freq), t)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + dur)
+
+    gain.gain.setValueAtTime(0.0001, t)
+    gain.gain.linearRampToValueAtTime(vol, t + Math.min(0.006, dur * 0.2))
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+
+    let node: AudioNode = osc
+    if (opts?.filterFreq) {
+      const f = this.ctx.createBiquadFilter()
+      f.type = opts.filterType ?? 'lowpass'
+      f.frequency.setValueAtTime(opts.filterFreq, t)
+      if (opts.filterQ) f.Q.setValueAtTime(opts.filterQ, t)
+      node.connect(f)
+      node = f
+    }
+    node.connect(gain)
+    gain.connect(this.sfxDry)
+    if (opts?.reverb) {
+      const revSend = this.ctx.createGain()
+      revSend.gain.setValueAtTime(opts.reverb, t)
+      gain.connect(revSend).connect(this.reverb)
+    }
+
+    osc.start(t)
+    osc.stop(t + dur + 0.05)
+  }
+
+  private playNoise(
+    dur: number,
+    filterFreq: number,
+    vol: number,
+    opts?: {
+      delay?: number
+      filterType?: BiquadFilterType
+      filterQ?: number
+      pink?: boolean
+      reverb?: number
+    },
+  ): void {
+    const t = this.ctx.currentTime + (opts?.delay ?? 0)
+    const src = this.ctx.createBufferSource()
+    src.buffer = opts?.pink ? this.pinkNoiseBuf : this.whiteNoiseBuf
+    src.loop = true
+
+    const filter = this.ctx.createBiquadFilter()
+    filter.type = opts?.filterType ?? 'bandpass'
+    filter.frequency.setValueAtTime(filterFreq, t)
+    if (opts?.filterQ) filter.Q.setValueAtTime(opts.filterQ, t)
+
+    const gain = this.ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, t)
+    gain.gain.linearRampToValueAtTime(vol, t + Math.min(0.004, dur * 0.25))
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+
+    src.connect(filter).connect(gain)
+    gain.connect(this.sfxDry)
+    if (opts?.reverb) {
+      const revSend = this.ctx.createGain()
+      revSend.gain.setValueAtTime(opts.reverb, t)
+      gain.connect(revSend).connect(this.reverb)
+    }
+
+    src.start(t)
+    src.stop(t + dur + 0.05)
+  }
+
   play(name: Sfx): void {
     if (this.ctx.state !== 'running') return
-    const t = this.ctx.currentTime
-
-    const tone = (freq: number, end: number, dur: number, type: OscillatorType, vol: number, delay = 0) => {
-      const o = this.ctx.createOscillator()
-      const g = this.ctx.createGain()
-      o.type = type
-      o.frequency.setValueAtTime(freq, t + delay)
-      o.frequency.exponentialRampToValueAtTime(Math.max(end, 20), t + delay + dur)
-      g.gain.setValueAtTime(0.0001, t + delay)
-      g.gain.linearRampToValueAtTime(vol, t + delay + 0.008)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + delay + dur)
-      o.connect(g).connect(this.sfx)
-      o.start(t + delay)
-      o.stop(t + delay + dur + 0.05)
-    }
-
-    const noiseTap = (dur: number, filterFreq: number, vol: number, delay = 0) => {
-      const bufferSize = Math.max(1, Math.floor(this.ctx.sampleRate * dur))
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate)
-      const data = buffer.getChannelData(0)
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3))
-      }
-      const noise = this.ctx.createBufferSource()
-      noise.buffer = buffer
-      const filter = this.ctx.createBiquadFilter()
-      filter.type = 'lowpass'
-      filter.frequency.setValueAtTime(filterFreq, t + delay)
-      const g = this.ctx.createGain()
-      g.gain.setValueAtTime(vol, t + delay)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + delay + dur)
-      noise.connect(filter).connect(g).connect(this.sfx)
-      noise.start(t + delay)
-    }
 
     switch (name) {
-      case 'pickup':
-        tone(880, 1320, 0.12, 'triangle', 0.28)
-        tone(1320, 1760, 0.16, 'sine', 0.22, 0.05)
-        break
-      case 'jump':
-        tone(280, 560, 0.14, 'triangle', 0.14)
-        break
-      case 'land':
-        noiseTap(0.08, 220, 0.18)
-        tone(140, 60, 0.09, 'sine', 0.2)
-        break
-      case 'hurt':
-        tone(180, 80, 0.22, 'sawtooth', 0.18)
-        break
-      case 'ui':
-        // Crisp haptic ceramic/glass micro-tap
-        tone(784, 820, 0.035, 'triangle', 0.14)
-        tone(1568, 1600, 0.025, 'sine', 0.08, 0.008)
-        break
-      case 'dash':
-        tone(440, 160, 0.16, 'sawtooth', 0.08)
-        noiseTap(0.14, 600, 0.12)
-        break
       case 'footstep': {
-        // Natural Scandinavian oak timber heel step with organic pitch variation
-        const pitchVar = 0.94 + Math.random() * 0.12
-        noiseTap(0.045, 340 * pitchVar, 0.09)
-        tone(115 * pitchVar, 55 * pitchVar, 0.06, 'sine', 0.12)
+        // Real Scandinavian oak timber floor impact with alternating foot dynamics
+        this.stepAlt = !this.stepAlt
+        const p = (this.stepAlt ? 1.02 : 0.96) * (0.97 + Math.random() * 0.06)
+
+        // Leather heel/sole strike transient (high-frequency filtered impact)
+        this.playNoise(0.018, 1950 * p, 0.12, { filterType: 'bandpass', filterQ: 2.2, reverb: 0.18 })
+
+        // Oak plank flexing resonance (cavity vibration)
+        this.playTone(122 * p, 110 * p, 0.065, 'triangle', 0.18, { filterFreq: 320, reverb: 0.2 })
+        this.playTone(240 * p, 215 * p, 0.045, 'sine', 0.09, { filterFreq: 450 })
+
+        // Subfloor cavity thump (low body weight)
+        this.playTone(74 * p, 46 * p, 0.042, 'sine', 0.16)
+
+        // Subtle timber scuff
+        this.playNoise(0.032, 1150 * p, 0.04, { filterType: 'bandpass', pink: true })
         break
       }
+
+      case 'ui': {
+        // Modern luxury ceramic/glass haptic tap (clean, snappy, non-tonal)
+        this.playNoise(0.004, 2100, 0.1, { filterType: 'bandpass', filterQ: 2.0 })
+        this.playTone(940, 880, 0.009, 'triangle', 0.06, { filterFreq: 1400 })
+        break
+      }
+
+      case 'ui_hover': {
+        // Ultra-subtle tactile micro-tick for UI element hover
+        this.playNoise(0.002, 2800, 0.025, { filterType: 'bandpass', filterQ: 2.8 })
+        break
+      }
+
+      case 'slider': {
+        // Tactile notch detent click when sliding settings ranges
+        this.playNoise(0.003, 1450, 0.04, { filterType: 'bandpass', filterQ: 2.2 })
+        this.playTone(620, 580, 0.006, 'triangle', 0.03)
+        break
+      }
+
+      case 'lens_flip': {
+        // Mechanical optical lens turret / camera aperture snap (Jack <-> John vision toggle)
+        // Shutter lever release
+        this.playNoise(0.008, 3600, 0.09, { filterType: 'highpass' })
+        this.playTone(850, 620, 0.015, 'sawtooth', 0.07, { filterFreq: 1200 })
+        // Glass element rotation & click
+        this.playNoise(0.014, 1650, 0.12, { delay: 0.022, filterType: 'bandpass', filterQ: 2.5 })
+        this.playTone(2850, 2600, 0.018, 'sine', 0.08, { delay: 0.022, reverb: 0.15 })
+        // Ball detent locking
+        this.playTone(3200, 3100, 0.038, 'sine', 0.06, { delay: 0.036, reverb: 0.2 })
+        this.playTone(380, 260, 0.032, 'triangle', 0.1, { delay: 0.036 })
+        break
+      }
+
       case 'paint':
-        // Wet oil paint palette swirl & glass chime
-        tone(440, 660, 0.14, 'sine', 0.16)
-        tone(660, 880, 0.12, 'triangle', 0.12, 0.04)
-        tone(1100, 1320, 0.1, 'sine', 0.08, 0.08)
+      case 'paint_drop': {
+        // Viscous wet oil pigment dollop and palette drop
+        this.playNoise(0.02, 1750, 0.1, { filterType: 'bandpass', filterQ: 1.8, reverb: 0.12 })
+        this.playTone(540, 240, 0.042, 'sine', 0.14)
+        // Secondary droplet
+        this.playTone(720, 380, 0.025, 'sine', 0.06, { delay: 0.028 })
+        this.playNoise(0.016, 2200, 0.04, { delay: 0.028, filterType: 'bandpass' })
         break
+      }
+
+      case 'palette_scrape': {
+        // Palette knife textured scrape across wooden palette
+        this.playNoise(0.085, 2700, 0.09, { filterType: 'bandpass', filterQ: 1.6, pink: true, reverb: 0.15 })
+        this.playTone(3100, 2700, 0.065, 'sine', 0.04, { filterFreq: 3400 })
+        break
+      }
+
+      case 'easel_adjust': {
+        // Wooden ratchet notch clack and easel peg seating
+        this.playNoise(0.014, 1850, 0.08, { filterType: 'bandpass', filterQ: 2.4 })
+        this.playTone(390, 340, 0.036, 'triangle', 0.15, { filterFreq: 750, reverb: 0.18 })
+        this.playTone(860, 800, 0.028, 'sine', 0.08, { filterFreq: 1100 })
+        break
+      }
+
       case 'frame':
-        // Museum frame alignment & brass mounting click
-        noiseTap(0.06, 480, 0.12)
-        tone(240, 160, 0.09, 'triangle', 0.18)
-        tone(520, 480, 0.06, 'sine', 0.12, 0.03)
+      case 'frame_slide': {
+        // Velvet-backed hardwood frame sliding and solid mounting bracket lock
+        this.playNoise(0.065, 880, 0.07, { filterType: 'bandpass', pink: true })
+        this.playNoise(0.018, 1600, 0.09, { delay: 0.032, filterType: 'bandpass', filterQ: 2.0 })
+        this.playTone(245, 190, 0.048, 'triangle', 0.16, { delay: 0.032, filterFreq: 500, reverb: 0.22 })
+        this.playTone(540, 480, 0.038, 'sine', 0.1, { delay: 0.032, filterFreq: 850 })
         break
-      case 'vault_bolt':
-        // Subterranean hydraulic lock bolt disengage and heavy metallic clank
-        tone(55, 40, 0.45, 'sine', 0.35)
-        noiseTap(0.18, 180, 0.28, 0.04)
-        tone(160, 85, 0.32, 'sawtooth', 0.18, 0.06)
-        tone(220, 110, 0.28, 'triangle', 0.16, 0.14)
+      }
+
+      case 'keypad_press': {
+        // Tactile mechanical keyboard switch clack
+        this.playNoise(0.003, 3900, 0.11, { filterType: 'highpass' })
+        this.playTone(490, 420, 0.014, 'triangle', 0.13, { filterFreq: 900 })
+        this.playTone(2250, 2180, 0.018, 'sine', 0.04, { delay: 0.004, reverb: 0.15 })
         break
-      case 'puzzle_success':
-        // Lush C-major 9th acoustic chime resolution
-        [523.25, 659.25, 783.99, 987.77, 1046.5].forEach((f, i) => {
-          tone(f, f * 1.002, 0.48, 'triangle', 0.22, i * 0.075)
-          tone(f * 2, f * 2, 0.32, 'sine', 0.08, i * 0.075 + 0.02)
+      }
+
+      case 'vault_bolt': {
+        // Subterranean multi-stage vault mechanism: precision tumblers + heavy bolt slide + massive resonant latch
+        this.playNoise(0.008, 2800, 0.1, { filterType: 'bandpass', filterQ: 3.0 })
+        this.playTone(2350, 2200, 0.016, 'sine', 0.08, { reverb: 0.25 })
+        this.playNoise(0.008, 3400, 0.11, { delay: 0.032, filterType: 'bandpass', filterQ: 3.0 })
+        this.playTone(3150, 3000, 0.016, 'sine', 0.09, { delay: 0.032, reverb: 0.25 })
+        this.playNoise(0.01, 4100, 0.12, { delay: 0.068, filterType: 'bandpass', filterQ: 3.0 })
+        this.playTone(4200, 4000, 0.018, 'sine', 0.1, { delay: 0.068, reverb: 0.3 })
+
+        // Heavy bolt friction slide
+        this.playNoise(0.2, 280, 0.18, { delay: 0.035, filterType: 'lowpass', pink: true })
+
+        // Subterranean heavy steel latch disengagement
+        this.playTone(44, 30, 0.42, 'sine', 0.35, { delay: 0.11, filterFreq: 180, reverb: 0.45 })
+        this.playTone(125, 88, 0.24, 'triangle', 0.22, { delay: 0.11, filterFreq: 320, reverb: 0.35 })
+        this.playTone(285, 210, 0.18, 'sawtooth', 0.12, { delay: 0.11, filterFreq: 450, reverb: 0.3 })
+        break
+      }
+
+      case 'station_focus': {
+        // Delicate acoustic focus shimmer when targeting an interactive workstation
+        this.playTone(1175, 1175, 0.075, 'sine', 0.035, { reverb: 0.25 })
+        this.playTone(587, 587, 0.065, 'sine', 0.02, { reverb: 0.2 })
+        break
+      }
+
+      case 'puzzle_success': {
+        // Museum-grade acoustic vibraphone & tubular chime chord with room resonance
+        const chord = [
+          { f: 349.23, vol: 0.22, delay: 0.0 }, // F4
+          { f: 523.25, vol: 0.24, delay: 0.038 }, // C5
+          { f: 698.46, vol: 0.22, delay: 0.076 }, // F5
+          { f: 880.0, vol: 0.2, delay: 0.114 }, // A5
+          { f: 1046.5, vol: 0.18, delay: 0.152 }, // C6
+        ]
+        chord.forEach(({ f, vol, delay }) => {
+          this.playTone(f, f * 1.001, 0.95, 'sine', vol, { delay, reverb: 0.45 })
+          this.playTone(f * 2.756, f * 2.756, 0.55, 'sine', vol * 0.35, { delay, reverb: 0.35 })
+          this.playNoise(0.012, f * 2.2, vol * 0.28, { delay, filterType: 'bandpass', filterQ: 3.5 })
         })
         break
-      case 'puzzle_fail':
-        [329.63, 293.66].forEach((f, i) => tone(f, f * 0.98, 0.26, 'sine', 0.18, i * 0.08))
+      }
+
+      case 'puzzle_fail': {
+        // Damped hardwood lock rejection thud
+        this.playTone(125, 78, 0.045, 'triangle', 0.13, { filterFreq: 220 })
+        this.playTone(88, 55, 0.055, 'sine', 0.15, { delay: 0.045 })
+        this.playNoise(0.025, 650, 0.07, { delay: 0.045, filterType: 'bandpass' })
         break
-      case 'win':
-        // Grand orchestral exhibition climax chord
-        [261.63, 329.63, 392.0, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-          tone(f, f * 1.001, 0.65, 'triangle', 0.2, i * 0.08)
-          tone(f * 2, f * 2, 0.4, 'sine', 0.07, i * 0.08 + 0.02)
+      }
+
+      case 'win': {
+        // Grand orchestral gallery tubular chime celebration with long reverb decay
+        const notes = [261.63, 392.0, 523.25, 659.25, 783.99, 987.77, 1046.5, 1318.51]
+        notes.forEach((f, i) => {
+          const delay = i * 0.068
+          this.playTone(f, f * 1.001, 1.8, 'sine', 0.24, { delay, reverb: 0.55 })
+          this.playTone(f * 2.756, f * 2.756, 0.85, 'sine', 0.08, { delay, reverb: 0.4 })
+          this.playNoise(0.015, f * 2.0, 0.07, { delay, filterType: 'bandpass', filterQ: 4.0 })
         })
         break
-      case 'lose':
-        [392, 330, 262, 196].forEach((f, i) => tone(f, f * 0.98, 0.4, 'sine', 0.22, i * 0.14))
+      }
+
+      case 'lose': {
+        ;[440, 370, 311, 220].forEach((f, i) => {
+          const delay = i * 0.14
+          this.playTone(f, f * 0.98, 0.55, 'sine', 0.16, { delay, reverb: 0.3 })
+        })
+        break
+      }
+
+      case 'pickup':
+        this.playTone(880, 880, 0.18, 'sine', 0.18, { reverb: 0.3 })
+        this.playTone(1320, 1320, 0.22, 'sine', 0.15, { delay: 0.045, reverb: 0.35 })
+        break
+
+      case 'jump':
+        this.playNoise(0.045, 520, 0.09, { filterType: 'bandpass', pink: true })
+        this.playTone(180, 320, 0.08, 'sine', 0.12)
+        break
+
+      case 'land':
+        this.playNoise(0.04, 750, 0.15, { filterType: 'bandpass' })
+        this.playTone(95, 50, 0.08, 'sine', 0.22, { reverb: 0.25 })
+        break
+
+      case 'hurt':
+        this.playTone(140, 60, 0.18, 'triangle', 0.16, { filterFreq: 300 })
+        this.playNoise(0.06, 400, 0.12, { filterType: 'lowpass' })
+        break
+
+      case 'dash':
+        this.playNoise(0.12, 600, 0.1, { filterType: 'bandpass', pink: true })
+        this.playTone(320, 140, 0.12, 'sine', 0.08)
         break
     }
   }

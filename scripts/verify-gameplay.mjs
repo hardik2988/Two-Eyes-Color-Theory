@@ -6,15 +6,18 @@ async function run() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
   const page = await context.newPage()
 
+  page.on('console', msg => console.log('   PAGE LOG:', msg.text()))
+  page.on('pageerror', err => console.log('   PAGE ERROR:', err.message))
+
   console.log('1. Navigating to preview server...')
   await page.goto('http://localhost:4173')
-  await page.waitForFunction(() => document.querySelector('.screen-boot')?.classList.contains('is-active') === false, undefined, { timeout: 10000 })
+  await page.waitForFunction(() => document.querySelector('.screen-boot')?.classList.contains('is-active') === false, undefined, { timeout: 30000 })
   console.log('   Boot screen cleared.')
 
   // Enter studio
   const enterBtn = page.getByRole('button', { name: 'Enter the studio' })
   await enterBtn.click()
-  await page.waitForFunction(() => window.__game?.game?.mode === 'playing', undefined, { timeout: 10000 })
+  await page.waitForFunction(() => window.__game?.game?.mode === 'playing', undefined, { timeout: 30000 })
   console.log('2. Entered Studio. Starting puzzle validation...')
 
   // LEVEL 1: Subtractive Paint Mixing

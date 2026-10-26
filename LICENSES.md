@@ -16,6 +16,7 @@ All 3D models, textures, and HDR environment maps in this project are licensed u
 - **oak_wood_planks**: PBR French White Oak plank textures (Diffuse, Normal OpenGL, Roughness). CC0.
 
 ## Environment Maps (Poly Haven - CC0)
+- **kloppenheim_02_4k.hdr**: 4K sunny outdoor panoramic sky with clouds, distant treeline, and realistic sun by Sergej Majboroda / Poly Haven. CC0.
 - **studio_small_08_2k.hdr**: 2K high-dynamic-range panoramic studio environment by Sergej Majboroda / Poly Haven. CC0.
 
 ## Fonts

@@ -49,6 +49,7 @@ export class Game {
   private time = 0
   private noteTime = 0
   private footstepAccumulator = 0
+  private lastFocusedTargetId: string | null = null
 
   // Vault opening animation state
   private vaultOpening = false
@@ -222,7 +223,7 @@ export class Game {
     this.perspective = this.perspective === 'jack' ? 'john' : 'jack'
     this.player.setPerspective(this.perspective, this.reducedMotion)
     this.renderer.setVisionMode(this.perspective, this.reducedMotion)
-    this.audio.play('ui')
+    this.audio.play('lens_flip')
 
     // Contextual perspective announcement
     if (this.perspective === 'john') {
@@ -297,9 +298,16 @@ export class Game {
       this.player.syncCamera()
       this.focusedTarget = this.findTarget()
       this.world.setTargetHover(this.focusedTarget)
+
+      const targetId = this.focusedTarget?.id ?? null
+      if (targetId && targetId !== this.lastFocusedTargetId) {
+        this.audio.play('station_focus')
+      }
+      this.lastFocusedTargetId = targetId
     } else if (this.mode === 'puzzle') {
       this.player.syncCamera()
       this.world.setTargetHover(null)
+      this.lastFocusedTargetId = null
     } else if (this.mode === 'attract') {
       const camera = this.player.camera
       const sway = this.reducedMotion ? 0 : Math.sin(this.time * 0.16) * 0.08
@@ -308,6 +316,7 @@ export class Game {
       camera.lookAt(0, 1.72, -4.1)
       this.focusedTarget = null
       this.world.setTargetHover(null)
+      this.lastFocusedTargetId = null
     }
     this.world.update(this.time, frameSeconds)
     this.renderer.render(this.world.scene, this.player.camera)
@@ -403,7 +412,7 @@ export class Game {
     if (puzzleId === 'paint-mixing' || this.focusedTarget.id === 'paint-tins') {
       this.note = 'The labels use a circle, triangle, square and diamond. Opening Subtractive Mixing Bench...'
       this.noteTime = 5
-      this.audio.play('paint')
+      this.audio.play('paint_drop')
       this.onOpenPuzzle?.(this.puzzles.paintMixing)
       return
     }
@@ -413,12 +422,12 @@ export class Game {
       if (this.puzzles.paintMixing.state !== 'completed') {
         this.note = 'Installation 02 is locked. Complete Installation 01 at the Mixing Bench first.'
         this.noteTime = 5
-        this.audio.play('ui')
+        this.audio.play('puzzle_fail')
         return
       }
       this.note = 'Opening Installation 02: Value Easel Workstation...'
       this.noteTime = 5
-      this.audio.play('frame')
+      this.audio.play('easel_adjust')
       this.onOpenPuzzle?.(this.puzzles.value)
       return
     }
@@ -428,12 +437,12 @@ export class Game {
       if (this.puzzles.value.state !== 'completed') {
         this.note = 'Installation 03 is locked. Complete Installation 02 at the Value Easel first.'
         this.noteTime = 5
-        this.audio.play('ui')
+        this.audio.play('puzzle_fail')
         return
       }
       this.note = 'Opening Installation 03: Gallery Wall Harmonies...'
       this.noteTime = 5
-      this.audio.play('frame')
+      this.audio.play('frame_slide')
       this.onOpenPuzzle?.(this.puzzles.harmonies)
       return
     }
@@ -444,7 +453,7 @@ export class Game {
         this.note =
           'The Exit Vault is locked. Complete Installations 01, 02, and 03 first to energize the keypad mechanism.'
         this.noteTime = 6
-        this.audio.play('ui')
+        this.audio.play('puzzle_fail')
         return
       }
       if (this.vaultOpening || this.puzzles.vault.isComplete) {

@@ -55,6 +55,8 @@ export class Ui {
   private stormShown = false
   private lastMethod = ''
   private activePerspective: Perspective = 'jack'
+  private lastHoveredElement: Element | null = null
+  private lastSliderTick = 0
 
   constructor(
     private readonly i18n: I18n,
@@ -69,10 +71,13 @@ export class Ui {
     this.root.addEventListener('click', e => this.onClick(e))
     this.root.addEventListener('click', e => this.onSiteClick(e))
     this.root.addEventListener('input', e => this.onInput(e))
+    this.root.addEventListener('mouseover', e => this.onHover(e))
+    this.root.addEventListener('mouseout', e => this.onMouseOut(e))
     this.root.addEventListener('focusin', e => {
-      if ((e.target as HTMLElement).matches('.btn, .seg button, .toggle')) this.audio.play('ui')
+      if ((e.target as HTMLElement).matches('.btn, .seg button, .toggle')) this.audio.play('ui_hover')
     })
     window.addEventListener('keydown', e => this.onKey(e))
+    window.addEventListener('pointerdown', () => this.audio.unlock(), { once: true })
     i18n.onChange(() => this.translate())
     this.translate()
     this.refreshSettings()
@@ -131,6 +136,7 @@ export class Ui {
     this.activePuzzle = null
     const overlay = this.q<HTMLElement>('#puzzle-overlay')
     if (overlay) overlay.classList.add('is-hidden')
+    this.audio.play('ui')
     this.onPuzzleClosed?.()
   }
 
@@ -398,7 +404,7 @@ export class Ui {
     if (pigmentBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
       const pid = pigmentBtn.dataset.pigment!
       this.activePuzzle.selectPigment(pid)
-      this.audio.play('paint')
+      this.audio.play('paint_drop')
       this.renderPuzzleDialog()
       return
     }
@@ -406,7 +412,7 @@ export class Ui {
     const clearBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="clear-palette"]')
     if (clearBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
       this.activePuzzle.clearSelection()
-      this.audio.play('ui')
+      this.audio.play('palette_scrape')
       this.renderPuzzleDialog()
       return
     }
@@ -415,7 +421,7 @@ export class Ui {
     if (valueBtn && this.activePuzzle instanceof ValuePuzzle) {
       const sid = valueBtn.dataset.sample!
       this.activePuzzle.selectSample(sid)
-      this.audio.play('frame')
+      this.audio.play('easel_adjust')
       this.renderPuzzleDialog()
       return
     }
@@ -431,7 +437,7 @@ export class Ui {
         if (p1 && p2) {
           p1.slot = targetSlot
           p2.slot = slot
-          this.audio.play('frame')
+          this.audio.play('frame_slide')
           this.renderPuzzleDialog()
         }
       }
@@ -444,7 +450,7 @@ export class Ui {
       if (key === 'clear') this.activePuzzle.clearKey()
       else if (key === 'backspace') this.activePuzzle.deleteKey()
       else this.activePuzzle.pressKey(key)
-      this.audio.play('ui')
+      this.audio.play('keypad_press')
       this.renderPuzzleDialog()
       return
     }
@@ -467,7 +473,7 @@ export class Ui {
     const resetPaletteBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="reset-palette"]')
     if (resetPaletteBtn && this.activePuzzle instanceof PaintMixingPuzzle) {
       this.activePuzzle.clearSelection()
-      this.audio.play('ui')
+      this.audio.play('palette_scrape')
       this.renderPuzzleDialog()
       return
     }
@@ -531,6 +537,28 @@ export class Ui {
     if (el.type !== 'range') return
     el.style.setProperty('--fill', `${((Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min))) * 100}%`)
     this.actions.settings({ [el.name]: Number(el.value) } as Partial<SaveData>)
+
+    const now = performance.now()
+    if (now - this.lastSliderTick > 40) {
+      this.lastSliderTick = now
+      this.audio.play('slider')
+    }
+  }
+
+  private onHover(e: MouseEvent): void {
+    const el = (e.target as HTMLElement).closest<HTMLElement>(
+      '.btn, .site-tab, .toggle, .seg button, .value-card, [data-pigment], .vault-key, [data-swap-dir], [data-action], input[type="range"]'
+    )
+    if (el && el !== this.lastHoveredElement) {
+      this.lastHoveredElement = el
+      this.audio.play('ui_hover')
+    }
+  }
+
+  private onMouseOut(e: MouseEvent): void {
+    if ((e.target as HTMLElement) === this.lastHoveredElement) {
+      this.lastHoveredElement = null
+    }
   }
 
   private onSiteClick(e: MouseEvent): void {
@@ -958,7 +986,7 @@ export class Ui {
       }
       this.onPuzzleSolved?.(this.activePuzzle.id)
     } else {
-      this.audio.play('ui')
+      this.audio.play('puzzle_fail')
     }
   }
 

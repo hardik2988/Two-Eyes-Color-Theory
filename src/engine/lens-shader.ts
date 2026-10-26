@@ -7,9 +7,9 @@ import * as THREE from 'three'
 export const LENS_SHADER = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
-    uVignetteDarkness: { value: 0.35 },
-    uVignetteOffset: { value: 1.15 },
-    uGrainAmount: { value: 0.012 },
+    uVignetteDarkness: { value: 0.24 },
+    uVignetteOffset: { value: 1.25 },
+    uGrainAmount: { value: 0.007 },
     uTime: { value: 0 },
   },
   vertexShader: /* glsl */ `

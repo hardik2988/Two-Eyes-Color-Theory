@@ -209,7 +209,7 @@ async function boot(): Promise<void> {
     }
   }, 250)
   // Debug/test hook (read-only use): smoke tests inspect run state through it.
-  ;(window as unknown as { __game: unknown }).__game = { game: g, ui, input, save }
+  ;(window as unknown as { __game: unknown }).__game = { game: g, ui, input, save, audio }
 }
 
 function safeGet(key: string): string | null {

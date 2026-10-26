@@ -1,5 +1,39 @@
+# Dependencies
 node_modules/
+/.pnpm-store/
+
+# Production build and preview outputs
 dist/
+build/
 shots/
-/.manus-webdev/preview-identity.json
 .work/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Logs and debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / Editor temporary files and caches
+.DS_Store
+Thumbs.db
+*.local
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Tooling caches
+.manus/
+.manus-webdev/
+/.manus-webdev/preview-identity.json
