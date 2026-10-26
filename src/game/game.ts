@@ -50,6 +50,7 @@ export class Game {
   private noteTime = 0
   private footstepAccumulator = 0
   private lastFocusedTargetId: string | null = null
+  private targetCheckFrame = 0
 
   // Vault opening animation state
   private vaultOpening = false
@@ -294,9 +295,13 @@ export class Game {
   render(_alpha: number, frameSeconds: number): void {
     this.time += frameSeconds
     if (this.mode === 'playing') {
-      this.player.look(this.input.takeLook())
+      const lookDelta = this.input.takeLook()
+      this.player.look(lookDelta)
       this.player.syncCamera()
-      this.focusedTarget = this.findTarget()
+      this.targetCheckFrame = (this.targetCheckFrame + 1) % 3
+      if (this.targetCheckFrame === 0 || Math.abs(lookDelta.x) > 0.001 || Math.abs(lookDelta.y) > 0.001) {
+        this.focusedTarget = this.findTarget()
+      }
       this.world.setTargetHover(this.focusedTarget)
 
       const targetId = this.focusedTarget?.id ?? null

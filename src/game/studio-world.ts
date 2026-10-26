@@ -70,28 +70,18 @@ export class StudioWorld {
     this.scene.environmentIntensity = 0.52
     pmrem.dispose()
 
-    // 2. Real CC0 Poly Haven 4K sunny sky HDRI photograph with clouds, distant treeline, and real lighting
+    // 2. Real CC0 Poly Haven sunny sky HDRI photograph with clouds, distant treeline, and real lighting
     if (typeof window !== 'undefined') {
       import('three/examples/jsm/loaders/RGBELoader.js')
         .then(({ RGBELoader }) => {
           new RGBELoader().load(
-            '/environments/kloppenheim_02_4k.hdr',
+            '/environments/kloppenheim_02_1k.hdr',
             hdrTexture => {
               hdrTexture.mapping = THREE.EquirectangularReflectionMapping
               this.scene.background = hdrTexture
               this.scene.backgroundBlurriness = 0.035
               this.scene.environment = hdrTexture
               this.scene.environmentIntensity = 0.72
-            },
-            undefined,
-            () => {
-              new RGBELoader().load('/environments/kloppenheim_02_2k.hdr', hdr2k => {
-                hdr2k.mapping = THREE.EquirectangularReflectionMapping
-                this.scene.background = hdr2k
-                this.scene.backgroundBlurriness = 0.035
-                this.scene.environment = hdr2k
-                this.scene.environmentIntensity = 0.72
-              })
             },
           )
         })
@@ -343,7 +333,7 @@ export class StudioWorld {
     this.keyLight = sun
     sun.position.set(-8.8, 9.5, -3.0)
     sun.castShadow = true
-    sun.shadow.mapSize.set(4096, 4096)
+    sun.shadow.mapSize.set(1024, 1024)
     sun.shadow.camera.left = -11
     sun.shadow.camera.right = 11
     sun.shadow.camera.top = 9
@@ -376,10 +366,10 @@ export class StudioWorld {
     this.scene.add(leftFrameLight)
 
     // 6. Recessed architectural spotlights over stations (soft warm gallery lighting with contact shadows)
-    this.addTrackSpot(0, 5.4, 3.05, 0, 0.95, 2.95, true, 1.8, 0.55) // Over mixing bench (targeted cleanly on worktop, no floor blowout)
-    this.addTrackSpot(-3.25, 5.4, 0.55, -3.25, 1.35, 0.55, true, 2.4, 0.7) // Over value easel
-    this.addTrackSpot(6.85, 5.4, -0.25, 6.85, 1.8, -0.25, true, 2.4, 0.7) // Over shelf
-    this.addTrackSpot(0, 5.4, -6.5, 0, 1.9, -7.15, true, 2.4, 0.7) // Over vault door
+    this.addTrackSpot(0, 5.4, 3.05, 0, 0.95, 2.95, false, 1.8, 0.55) // Over mixing bench
+    this.addTrackSpot(-3.25, 5.4, 0.55, -3.25, 1.35, 0.55, false, 2.4, 0.7) // Over value easel
+    this.addTrackSpot(6.85, 5.4, -0.25, 6.85, 1.8, -0.25, false, 2.4, 0.7) // Over shelf
+    this.addTrackSpot(0, 5.4, -6.5, 0, 1.9, -7.15, false, 2.4, 0.7) // Over vault door
   }
 
   private addTrackSpot(
@@ -605,7 +595,7 @@ export class StudioWorld {
     const z = 3.05
 
     // Heavy solid architectural timber workbench top with bevelled chamfer edges
-    this.box('Mixing bench slab', v3(3.8, 0.12, 1.35), v3(x, 0.88, z), this.mats.darkWood, true)
+    this.box('Mixing bench slab', v3(3.8, 0.12, 1.35), v3(x, 0.88, z), this.mats.darkWood, true, true)
     // Upper chamfered rim
     this.mesh(this.scene, new THREE.BoxGeometry(3.84, 0.03, 1.39), this.mats.darkWood, [x, 0.945, z])
     // Lower bullnose reveal trim
@@ -628,7 +618,7 @@ export class StudioWorld {
     for (const dx of [-1.65, 1.65]) {
       for (const dz of [-0.52, 0.52]) {
         // Main solid leg
-        this.box('Bench leg', v3(0.14, 0.78, 0.14), v3(x + dx, 0.41, z + dz), this.mats.wood, true)
+        this.box('Bench leg', v3(0.14, 0.78, 0.14), v3(x + dx, 0.41, z + dz), this.mats.wood, true, true)
         // Brass shoe ferrule at floor contact
         this.mesh(this.scene, new THREE.BoxGeometry(0.15, 0.06, 0.15), this.mats.brass, [x + dx, 0.03, z + dz])
         // Leg top bracket collar
@@ -830,10 +820,10 @@ export class StudioWorld {
 
     // Architectural wooden studio A-frame easel
     for (const dx of [-0.48, 0.48]) {
-      const leg = this.mesh(object, new THREE.BoxGeometry(0.08, 2.45, 0.09), this.mats.wood, [dx, 1.2, 0.02])
+      const leg = this.mesh(object, new THREE.BoxGeometry(0.08, 2.45, 0.09), this.mats.wood, [dx, 1.2, 0.02], true)
       leg.rotation.z = dx * 0.15
     }
-    this.mesh(object, new THREE.BoxGeometry(0.08, 2.3, 0.09), this.mats.wood, [0, 1.15, -0.38]).rotation.z = -0.08
+    this.mesh(object, new THREE.BoxGeometry(0.08, 2.3, 0.09), this.mats.wood, [0, 1.15, -0.38], true).rotation.z = -0.08
     this.box('Easel ledge', v3(1.25, 0.09, 0.22), v3(-3.25, 1.35, 0.55), this.mats.brass, false)
 
     // Stretched canvas on easel showing value study painting (Slightly larger, deeper bevelled frame, glass reflection)
@@ -844,7 +834,7 @@ export class StudioWorld {
       metalness: 0.0,
       emissive: new THREE.Color(0x000000),
     })
-    this.mesh(object, new THREE.BoxGeometry(1.28, 1.62, 0.10), this.mats.darkWood, [0, 2.25, 0.06])
+    this.mesh(object, new THREE.BoxGeometry(1.28, 1.62, 0.10), this.mats.darkWood, [0, 2.25, 0.06], true)
     this.mesh(object, new THREE.BoxGeometry(1.20, 1.54, 0.02), this.mats.champagneBronze, [0, 2.25, 0.10])
     this.mesh(object, new THREE.BoxGeometry(1.16, 1.50, 0.02), studyMat, [0, 2.25, 0.115])
 
@@ -936,7 +926,7 @@ export class StudioWorld {
     object.add(podium)
 
     // Travertine Plinth Base
-    this.mesh(podium, new THREE.BoxGeometry(1.4, 0.94, 0.75), this.mats.travertine, [0, 0.47, 0])
+    this.mesh(podium, new THREE.BoxGeometry(1.4, 0.94, 0.75), this.mats.travertine, [0, 0.47, 0], true)
     // Polished Brass Trim Bands
     this.mesh(podium, new THREE.BoxGeometry(1.44, 0.05, 0.79), this.mats.brass, [0, 0.025, 0])
     this.mesh(podium, new THREE.BoxGeometry(1.44, 0.06, 0.79), this.mats.brass, [0, 0.94, 0])
@@ -1312,9 +1302,9 @@ export class StudioWorld {
   }
 
   private addArchitecturalBench(x: number, z: number): void {
-    this.box('Bench plank', v3(2.6, 0.12, 0.65), v3(x, 0.48, z), this.mats.wood, true)
+    this.box('Bench plank', v3(2.6, 0.12, 0.65), v3(x, 0.48, z), this.mats.wood, true, true)
     for (const dx of [-1.05, 1.05]) {
-      this.box('Bench support', v3(0.1, 0.42, 0.58), v3(x + dx, 0.24, z), this.mats.blackSteel, true)
+      this.box('Bench support', v3(0.1, 0.42, 0.58), v3(x + dx, 0.24, z), this.mats.blackSteel, true, true)
     }
   }
 
@@ -1340,7 +1330,7 @@ export class StudioWorld {
     this.mesh(pillar, new THREE.BoxGeometry(0.74, 0.06, 0.74), this.mats.concrete, [0, 0.25, 0])
 
     // 2. Bevelled architectural shaft with real chamfered corner edges
-    this.mesh(pillar, new THREE.BoxGeometry(0.64, 4.8, 0.64), this.mats.concrete, [0, 2.68, 0])
+    this.mesh(pillar, new THREE.BoxGeometry(0.64, 4.8, 0.64), this.mats.concrete, [0, 2.68, 0], true)
     for (const cdx of [-0.315, 0.315]) {
       for (const cdz of [-0.315, 0.315]) {
         const chamfer = this.mesh(pillar, new THREE.BoxGeometry(0.04, 4.8, 0.04), this.mats.concrete, [cdx, 2.68, cdz])
@@ -2347,14 +2337,14 @@ export class StudioWorld {
     return mesh
   }
 
-  private box(name: string, size: THREE.Vector3, center: THREE.Vector3, material: THREE.Material, collide: boolean, castShadow = true): THREE.Mesh {
+  private box(name: string, size: THREE.Vector3, center: THREE.Vector3, material: THREE.Material, collide: boolean, castShadow = false): THREE.Mesh {
     const mesh = this.mesh(this.scene, new THREE.BoxGeometry(size.x, size.y, size.z), material, [center.x, center.y, center.z], castShadow)
     mesh.name = name
     if (collide) this.physics.addStaticBox(center, size)
     return mesh
   }
 
-  private mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position: [number, number, number], castShadow = true): THREE.Mesh {
+  private mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material, position: [number, number, number], castShadow = false): THREE.Mesh {
     const mesh = new THREE.Mesh(geometry, material)
     mesh.position.set(position[0], position[1], position[2])
     mesh.castShadow = castShadow
@@ -2381,7 +2371,7 @@ export class StudioWorld {
               const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
               if (m && m.map) {
                 m.map.colorSpace = THREE.SRGBColorSpace
-                m.map.anisotropy = 16
+                m.map.anisotropy = 4
               }
             }
           })
@@ -2401,12 +2391,20 @@ export class StudioWorld {
             clone.rotation.y = loc.rotY
             clone.traverse(child => {
               if ((child as THREE.Mesh).isMesh) {
-                child.castShadow = true
+                const name = child.name.toLowerCase()
+                // Hide high-poly internal pebble filler inside the pot (saves 113,756 triangles)
+                if (name.includes('pebble')) {
+                  child.visible = false
+                  child.castShadow = false
+                  return
+                }
+                // Pot casts shadow; dirt and leaves only receive shadows (saves 213,800 shadow vertex ops)
+                child.castShadow = name.includes('_pot')
                 child.receiveShadow = true
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2427,12 +2425,13 @@ export class StudioWorld {
             clone.rotation.y = loc.rotY
             clone.traverse(child => {
               if ((child as THREE.Mesh).isMesh) {
-                child.castShadow = true
+                const name = child.name.toLowerCase()
+                child.castShadow = name.includes('_pot')
                 child.receiveShadow = true
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2452,12 +2451,12 @@ export class StudioWorld {
             clone.scale.setScalar(loc.scale)
             clone.traverse(child => {
               if ((child as THREE.Mesh).isMesh) {
-                child.castShadow = true
+                child.castShadow = false
                 child.receiveShadow = true
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2485,7 +2484,7 @@ export class StudioWorld {
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2525,7 +2524,7 @@ export class StudioWorld {
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2540,7 +2539,7 @@ export class StudioWorld {
           }
         })
 
-        // 4. Architectural Wooden Bookshelf (Dual modular library bank)
+        // 7. Architectural Wooden Bookshelf (Dual modular library bank)
         loader.load('/models/wooden_bookshelf_worn/wooden_bookshelf_worn_1k.gltf', gltf => {
           for (const dz of [-0.685, 0.685]) {
             const shelf = gltf.scene.clone(true)
@@ -2554,7 +2553,7 @@ export class StudioWorld {
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2562,7 +2561,7 @@ export class StudioWorld {
           }
         })
 
-        // 5. Studio Wooden Benches
+        // 8. Studio Wooden Benches
         loader.load('/models/painted_wooden_bench/painted_wooden_bench_1k.gltf', gltf => {
           const benchLocations = [
             { pos: v3(3.4, 0, 4.8), rotY: 0, scale: 1.1 },
@@ -2580,7 +2579,7 @@ export class StudioWorld {
                 const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
                 if (m && m.map) {
                   m.map.colorSpace = THREE.SRGBColorSpace
-                  m.map.anisotropy = 16
+                  m.map.anisotropy = 4
                 }
               }
             })
@@ -2588,7 +2587,7 @@ export class StudioWorld {
           }
         })
 
-        // 6. Studio Wooden Stool
+        // 9. Studio Wooden Stool
         loader.load('/models/wooden_stool_01/wooden_stool_01_1k.gltf', gltf => {
           const stool = gltf.scene
           stool.position.set(-3.25, 0, 1.95)
@@ -2600,7 +2599,7 @@ export class StudioWorld {
               const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
               if (m && m.map) {
                 m.map.colorSpace = THREE.SRGBColorSpace
-                m.map.anisotropy = 16
+                m.map.anisotropy = 4
               }
             }
           })
